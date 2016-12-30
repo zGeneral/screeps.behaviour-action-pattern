@@ -69,9 +69,9 @@ var mod = {
                     }
                     else if( !room.controller.my && room.controller.reservation ){
                         // controller
-                        message = '<ul><li><b>Room ' + room.name + '</b><br/><u>Controller</u><ul><li>Reservation: ' +
+                        message = '<li><b>Room ' + room.name + '</b><br/><u>Controller</u><ul><li>Reservation: ' +
                             room.controller.reservation.ticksToEnd + ' for ' +
-                            room.controller.reservation.username + '</li></ul></li></ul>';
+                            room.controller.reservation.username + '</li></ul></li>';
                         Memory.statistics.reports.push(message);
                     }
                 }
