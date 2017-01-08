@@ -71,16 +71,19 @@ module.exports.loop = function () {
                 for (const key of keys) {
                     if (typeof viralOverride[key] === "function") {
                         let original = mod[key];
-                        // will result in callstack exceed :/
-                        // if( !mod[key].original ) mod[key].original = original;
-                        if( !mod.baseOf ) mod.baseOf = {};
-                        // namespace will allow to extend multiple times.
-                        if( !mod.baseOf[namespace] ) mod.baseOf[namespace] = {};
-                        if( !mod.baseOf[namespace][key] ) mod.baseOf[namespace][key] = original;
-                        
-                        mod[key] = viralOverride[key].bind(mod);
+                        if( !mod.extension ) mod.extension = {};
+                        if( !mod.extension[namespace] ) mod.extension[namespace] = {};
+                        if( !mod.extension[namespace][key] ) {
+                            //console.log('extending ' + namespace + "." + key);
+                            mod.extension[namespace][key] = true;
+                            mod[key] = function(...args){ 
+                                    // console.log('calling ' + namespace + "." + key);
+                                    if( original ) original.apply(mod, args);
+                                    viralOverride[key].apply(mod, args);
+                            };
+                        }
                     } else {
-                        mod[key] = viralOverride[key]
+                        mod[key] = viralOverride[key];
                     }
                 }
             }

@@ -1,7 +1,4 @@
 var mod = {
-    custom: function(){
-        //console.log('base');
-    },
     init: function(params){
         // Load extension functions
         Creep.extend = load("creep").extend;
