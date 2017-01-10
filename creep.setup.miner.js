@@ -7,7 +7,8 @@ setup.default = {
     minAbsEnergyAvailable: 500,
     minEnergyAvailable: 0.3,
     maxMulti: 1,
-    maxCount: room => room.sources.length
+    maxCount: room => room.sources.length,
+    highPriority: 80,
 };
 setup.RCL = {
     1: setup.none,

@@ -10,7 +10,8 @@ setup.default = {
     minEnergyAvailable: 0.8,
     maxMulti: 15,
     minMulti: (room) => (room.controller.level),
-    maxWeight: (room) => room.privateerMaxWeight
+    maxWeight: (room) => room.privateerMaxWeight,
+    lowPriority: 10,
 };
 setup.RCL = {
     1: setup.none,

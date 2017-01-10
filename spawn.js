@@ -1,30 +1,22 @@
 let mod = {};
 module.exports = mod;
-mod.priorityHigh = [
-        Creep.setup.worker,
-        Creep.setup.miner,
-        Creep.setup.hauler,
-        Creep.setup.upgrader];
-mod.priorityLow = [
-        Creep.setup.mineralMiner,
-        Creep.setup.privateer];
 mod.extend = function(){
     Spawn.prototype.execute = function(){
         if( this.spawning ) return;
         let room = this.room;
-        // old spawning system 
+        // old spawning system
         let that = this;
         let probe = setup => {
             return setup.isValidSetup(room) && that.createCreepBySetup(setup);
         }
 
         let busy = this.createCreepByQueue(room.spawnQueueHigh);
-        // don't spawn lower if there is one waiting in the higher queue 
+        // don't spawn lower if there is one waiting in the higher queue
         if( !busy && room.spawnQueueHigh.length == 0 && Game.time % SPAWN_INTERVAL == 0 ) {
-            busy = _.some(Spawn.priorityHigh, probe);
+            busy = _.some(room.setupQueueHigh, probe);
             if( !busy ) busy = this.createCreepByQueue(room.spawnQueueMedium);
             if( !busy && room.spawnQueueMedium.length == 0 ) {
-                busy = _.some(Spawn.priorityLow, probe);
+                busy = _.some(room.setupQueueLow, probe);
                 if( !busy ) busy = this.createCreepByQueue(room.spawnQueueLow);
             }
         }
@@ -87,7 +79,7 @@ mod.extend = function(){
                 this.room,
                 this.name,
                 body,
-                destiny); 
+                destiny);
             this.newSpawn = {name: newName};
             Creep.spawningStarted.trigger({spawn: this.name, name: newName, destiny: destiny});
             if(CENSUS_ANNOUNCEMENTS) global.logSystem(this.pos.roomName, dye(CRAYON.birth, 'Good morning ' + newName + '!') );

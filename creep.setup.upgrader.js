@@ -58,7 +58,8 @@ setup.default = {
     minAbsEnergyAvailable: 400,
     minEnergyAvailable: 0.5,
     maxMulti: setup.maxMulti,
-    maxCount: setup.maxCount
+    maxCount: setup.maxCount,
+    highPriority: 50,
 };
 setup.RCL = {
     1: setup.none,

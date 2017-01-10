@@ -216,7 +216,7 @@ mod.extend = function(){
                                     // not decayable or below threshold
                                     ( !DECAYABLES.includes(structure.structureType) || (structure.hitsMax - structure.hits) > GAP_REPAIR_DECAYABLE ) &&
                                     // not pavement art
-                                    ( Memory.pavementArt[that.room.name] === undefined || Memory.pavementArt[that.room.name].indexOf('x'+structure.pos.x+'y'+structure.pos.y+'x') < 0 ) && 
+                                    ( Memory.pavementArt[that.room.name] === undefined || Memory.pavementArt[that.room.name].indexOf('x'+structure.pos.x+'y'+structure.pos.y+'x') < 0 ) &&
                                     // not flagged for removal
                                     ( !FlagDir.list.some(f => f.roomName == structure.pos.roomName && f.color == COLOR_ORANGE && f.x == structure.pos.x && f.y == structure.pos.y) )
                                 )
@@ -250,7 +250,7 @@ mod.extend = function(){
                                     structure.hits < MAX_FORTIFY_LIMIT[that.room.controller.level] &&
                                     ( structure.structureType != STRUCTURE_CONTAINER || structure.hits < MAX_FORTIFY_CONTAINER ) &&
                                     ( !DECAYABLES.includes(structure.structureType) || (structure.hitsMax - structure.hits) > GAP_REPAIR_DECAYABLE*3 ) &&
-                                    ( Memory.pavementArt[that.room.name] === undefined || Memory.pavementArt[that.room.name].indexOf('x'+structure.pos.x+'y'+structure.pos.y+'x') < 0 ) && 
+                                    ( Memory.pavementArt[that.room.name] === undefined || Memory.pavementArt[that.room.name].indexOf('x'+structure.pos.x+'y'+structure.pos.y+'x') < 0 ) &&
                                     ( !FlagDir.list.some(f => f.roomName == structure.pos.roomName && f.color == COLOR_ORANGE && f.x == structure.pos.x && f.y == structure.pos.y) )
                                 )
                             ),
@@ -760,6 +760,15 @@ mod.extend = function(){
                 return this.memory.spawnQueueHigh;
             }
         },
+        'setupQueueHigh': { // room.setupQueueHigh.map(i=>i.type) to debug
+            configurable: true,
+            get: function() {
+                if( _.isUndefined(this._setupQueueHigh) ) {
+                    this._setupQueueHigh = Creep.setupQueue('highPriority', this.controller.level);
+                }
+                return this._setupQueueHigh;
+            }
+        },
         'spawnQueueMedium': {
             configurable: true,
             get: function() {
@@ -767,6 +776,15 @@ mod.extend = function(){
                     this.memory.spawnQueueMedium = [];
                 }
                 return this.memory.spawnQueueMedium;
+            }
+        },
+        'setupQueueLow': {
+            configurable: true,
+            get: function() {
+                if( _.isUndefined(this._setupQueueLow) ) {
+                    this._setupQueueLow = Creep.setupQueue('lowPriority', this.controller.level);
+                }
+                return this._setupQueueLow;
             }
         },
         'spawnQueueLow': {
@@ -862,7 +880,7 @@ mod.extend = function(){
         if( sites.length == 0 ) return null;
         let siteOrder = [STRUCTURE_SPAWN,STRUCTURE_EXTENSION,STRUCTURE_LINK,STRUCTURE_STORAGE,STRUCTURE_TOWER,STRUCTURE_ROAD,STRUCTURE_CONTAINER,STRUCTURE_EXTRACTOR,STRUCTURE_WALL,STRUCTURE_RAMPART];
         let rangeOrder = site => {
-            let order = siteOrder.indexOf(site.structureType); 
+            let order = siteOrder.indexOf(site.structureType);
             return pos.getRangeTo(site) + ( order < 0 ? 100000 : (order * 100) );
             //if( order < 0 ) return 100000 + pos.getRangeTo(site);
             //return ((order - (site.progress / site.progressTotal)) * 100) + pos.getRangeTo(site);
@@ -1148,7 +1166,7 @@ mod.extend = function(){
             // if invader id unregistered
             if( !that.memory.hostileIds.includes(creep.id) ){
                 // handle new invader
-                // register 
+                // register
                 that.memory.hostileIds.push(creep.id);
                 // save to trigger subscribers later
                 that.newInvader.push(creep)
@@ -1245,7 +1263,7 @@ mod.analyze = function(){
             console.log( dye(CRAYON.error, 'Error in room.js (Room.prototype.loop) for "' + room.name + '": <br/>' + err.toString()+ '<br/>' + err.stack));
         }
     };
-    _.forEach(Game.rooms, getEnvironment);        
+    _.forEach(Game.rooms, getEnvironment);
 };
 mod.execute = function() {
     let triggerNewInvaders = creep => {
@@ -1287,12 +1305,12 @@ mod.findSpawnRoom = function(params){
     if( !params || !params.targetRoom ) return null;
     // filter validRooms
     let isValidRoom = room => (
-        room.my && 
+        room.my &&
         (params.minEnergyCapacity === undefined || params.minEnergyCapacity <= room.energyCapacityAvailable) &&
         (params.minEnergyAvailable === undefined || params.minEnergyAvailable <= room.energyAvailable) &&
         (room.name != params.targetRoom || params.allowTargetRoom === true) &&
-        (params.minRCL === undefined || room.controller.level >= params.minRCL) && 
-        (params.callBack === undefined || params.callBack(room)) 
+        (params.minRCL === undefined || room.controller.level >= params.minRCL) &&
+        (params.callBack === undefined || params.callBack(room))
     );
     let validRooms = _.filter(Game.rooms, isValidRoom);
     if( validRooms.length == 0 ) return null;
@@ -1301,7 +1319,7 @@ mod.findSpawnRoom = function(params){
     let queueTime = queue => _.sum(queue, c => (c.parts.length*3));
     let roomTime = room => ((queueTime(room.spawnQueueLow)*0.9) + queueTime(room.spawnQueueMedium) + (queueTime(room.spawnQueueHigh)*1.1) ) / room.structures.spawns.length;
     let evaluation = room => { return routeRange(room.name, params.targetRoom) +
-        ( (8-room.controller.level) / (params.rangeRclRatio||3) ) + 
+        ( (8-room.controller.level) / (params.rangeRclRatio||3) ) +
         ( roomTime(room) / (params.rangeQueueRatio||51) );
     }
     return _.min(validRooms, evaluation);

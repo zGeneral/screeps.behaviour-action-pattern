@@ -47,7 +47,8 @@ setup.default = {
     minEnergyAvailable: 0.4,
     maxMulti: setup.maxMulti,
     maxCount: setup.maxCount,
-    maxWeight: setup.maxWeight
+    maxWeight: setup.maxWeight,
+    highPriority: 90,
 };
 setup.RCL = {
     1: setup.none,
