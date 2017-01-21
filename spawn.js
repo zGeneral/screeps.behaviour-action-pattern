@@ -15,8 +15,12 @@ mod.extend = function(){
         // old spawning system 
         let that = this;
         let probe = setup => {
-            return setup.isValidSetup(room) && that.createCreepBySetup(setup);
-        }
+            try {
+                return setup.isValidSetup(room) && that.createCreepBySetup(setup);
+            } catch(e) {
+                return false;
+            }
+        };
 
         let busy = this.createCreepByQueue(room.spawnQueueHigh);
         // don't spawn lower if there is one waiting in the higher queue 
