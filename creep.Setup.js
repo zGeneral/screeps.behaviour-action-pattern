@@ -165,7 +165,7 @@ let Setup = function(typeName){
             }
 
             if( parts.includes(TOUGH) ) {
-                let index = parts.indexOf(HEAL);
+                let index = parts.indexOf(TOUGH);
                 parts.splice(index, 1);
                 parts.unshift(TOUGH);
             }
