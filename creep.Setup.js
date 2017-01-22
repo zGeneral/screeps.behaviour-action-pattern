@@ -163,6 +163,12 @@ let Setup = function(typeName){
                 parts.splice(index, 1);
                 parts.push(HEAL);
             }
+
+            if( parts.includes(TOUGH) ) {
+                let index = parts.indexOf(HEAL);
+                parts.splice(index, 1);
+                parts.unshift(TOUGH);
+            }
         }
         return parts;
     };
