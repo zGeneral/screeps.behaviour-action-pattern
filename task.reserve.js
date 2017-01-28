@@ -6,7 +6,8 @@ mod.creep = {
         fixedBody: [CLAIM, CLAIM, MOVE, MOVE],
         multiBody: [],
         name: "reserver", 
-        behaviour: "claimer"
+        behaviour: "claimer",
+        queue: "Low"
     },
 };
 // hook into events
