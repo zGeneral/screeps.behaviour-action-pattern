@@ -25,22 +25,25 @@ mod.LiteEvent = function(name) {
     // register a new subscriber
     this.on = function(handler) {
         this.handlers.push(handler);
-    }
+    };
     // remove a registered subscriber
     this.off = function(handler) {
         this.handlers = this.handlers.filter(h => h !== handler);
-    }
+    };
     // call all registered subscribers
     this.trigger = function(data) {
-        let start = Game.cpu.getUsed();
+        let c = saveCPU();
         try{
-            this.handlers.slice(0).forEach(h => h(data));
+            this.handlers.slice(0).forEach(h => {
+                let b = saveCPU();
+                h(data);
+                b.checkCPU('(' + this.name + ')' + '(' + h + ')', 5);
+            });
         } catch(e){
             global.logError('Error in LiteEvent.trigger: ' + (e.stack || e));
         }
-        let end = Game.cpu.getUsed();
-        if (end - start > 1) console.log(data, 'Event', this.name, end - start, this.handlers.length, 'handlers');
-    }
+        c.checkCPU('(' + this.name + ' total)(' + data + ')(' + this.handlers.length + ')', 10);
+    };
 };
 // Flag colors, used throughout the code
 //COLOR_RED
@@ -264,7 +267,7 @@ mod.isSummerTime = function(date){
 };
 // add a game object, obtained from its id, to an array
 mod.addById = function(array, id){
-    if(array == null) array = [];
+    if(array === null) array = [];
     var obj = Game.getObjectById(id);
     if( obj ) array.push(obj);
     return array;
@@ -343,5 +346,32 @@ mod.guid = function(){
         var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
+};
+mod.checkCPU = function(name, limit, then) {
+    limit = limit ? limit : 0.1;
+    let now = Game.cpu.getUsed();
+    if (then && now - then > limit) {
+        console.log(name, 'usedCpu:', now - then);
+        return true;
+    }
+    return false;
+};
+mod.saveCPU = function() {
+    if (PROFILE) {
+        let now = Game.cpu.getUsed();
+        return {
+            saveCPU: () => now = Game.cpu.getUsed(),
+            checkCPU: (name, limit) => {
+                let ret = checkCPU(name, limit, now);
+                now = Game.cpu.getUsed();
+                return ret;
+            }
+        };
+    } else {
+        return {
+            saveCPU: () => {},
+            checkCPU: () => {}
+        };
+    }
 };
 mod = _.bindAll(mod);
