@@ -18,7 +18,8 @@ const noMemoryWhere = function(e) {
 let mod = {};
 module.exports = mod;
 // base class for events
-mod.LiteEvent = function() {
+mod.LiteEvent = function(name) {
+    this.name = name;
     // registered subscribers
     this.handlers = [];
     // register a new subscriber
@@ -31,11 +32,14 @@ mod.LiteEvent = function() {
     }
     // call all registered subscribers
     this.trigger = function(data) {
+        let start = Game.cpu.getUsed();
         try{
             this.handlers.slice(0).forEach(h => h(data));
         } catch(e){
             global.logError('Error in LiteEvent.trigger: ' + (e.stack || e));
         }
+        let end = Game.cpu.getUsed();
+        if (end - start > 1) console.log(data, 'Event', this.name, end - start, this.handlers.length, 'handlers');
     }
 };
 // Flag colors, used throughout the code
