@@ -5,6 +5,7 @@ action.isAddableAction = function(){ return true; };
 action.isAddableTarget = function(){ return true; };
 action.newTarget = function(creep){ return null; }
 action.step = function(creep){
+    let p = startProfiling(creep.name);
     if(CHATTY) creep.say(this.name, SAY_PUBLIC);
     if( creep.target ){
         let pos;
@@ -20,6 +21,7 @@ action.step = function(creep){
         delete creep.data.targetId;
         delete creep.data.travelRoom;
     }
+    p.checkCPU('Travelling.step', 2);
 }
 action.onAssignment = function(creep, target) {
     if( SAY_ASSIGNMENT ) creep.say(String.fromCharCode(9784), SAY_PUBLIC);
