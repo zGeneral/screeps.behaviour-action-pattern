@@ -289,5 +289,4 @@ module.exports.loop = function () {
 
     if( DEBUG && TRACE ) trace('main', {cpuAtLoad, cpuAtFirstLoop, cpuAtLoop, cpuTick: Game.cpu.getUsed(), isNewServer: global.isNewServer, lastServerSwitch: Game.lastServerSwitch, main:'cpu'});
     p.total();
-    console.log('\n');
 };
