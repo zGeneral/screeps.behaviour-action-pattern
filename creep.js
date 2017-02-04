@@ -221,7 +221,10 @@ mod.extend = function(){
             var route = this.room.findRoute(targetPos.roomName);
             if ( route.length > 1 ) {
                 targetPos = new RoomPosition(25, 25, route[1].room);
-                range = 24;
+                this.roomPositionBias(targetPos);
+                range = Math.min(24 - Math.abs(targetPos.x - 25), 24 - Math.abs(targetPos.y - 25));
+                ignoreCreeps = true;
+                if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, targetPos, range, getPath:'routePrecalc', Creep:'getPath'});
             }
         }
 
@@ -234,6 +237,35 @@ mod.extend = function(){
             return path.substr(4);
         else return null;
     };
+    Creep.prototype.roomPositionBias = function(targetPos) {
+        const startRoom = this.pos.roomName;
+        const exits = Game.map.describeExits(targetPos.roomName);
+        // move target away from exits based on their weight
+        for( const dir in exits ) {
+            switch(+dir) {
+                case TOP:
+                    targetPos.y = targetPos.y +
+                        (routeRange(startRoom, exits[dir]) + (ROUTE_ROOM_COST[exits[dir]] || 1) - 2);
+                    break;
+                case BOTTOM:
+                    targetPos.y = targetPos.y -
+                        (routeRange(startRoom, exits[dir]) + (ROUTE_ROOM_COST[exits[dir]] || 1) - 2);
+                    break;
+                case LEFT:
+                    targetPos.x = targetPos.x +
+                        (routeRange(startRoom, exits[dir]) + (ROUTE_ROOM_COST[exits[dir]] || 1) - 2);
+                    break;
+                case RIGHT:
+                    targetPos.x = targetPos.x -
+                        (routeRange(startRoom, exits[dir]) + (ROUTE_ROOM_COST[exits[dir]] || 1) - 2);
+                    break;
+            }
+        }
+        if( targetPos.y !== 25) targetPos.y = targetPos.y > 25 ? 35 : 15;
+        if( targetPos.x !== 25) targetPos.x = targetPos.x > 25 ? 35 : 15;
+        return targetPos;
+    };
+
     Creep.prototype.fleeMove = function() {
         if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, Action:'fleeMove', Creep:'run'});
         let drop = r => { if(this.carry[r] > 0 ) this.drop(r); };
@@ -280,6 +312,7 @@ mod.extend = function(){
                 let goals = _.map(this.room.structures.all, function(o) {
                     return { pos: o.pos, range: 1 };
                 });
+
 
                 let ret = PathFinder.search(
                     this.pos, goals, {
