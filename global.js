@@ -366,7 +366,10 @@ mod.startProfiling = function(label) {
                 return false;
             },
             reset: () => then = Game.cpu.getUsed(),
-            total: () => global.logSystem(label + ' total ', _.round(_total, 2) + ' CPU') && console.log('\n')
+            total: () => {
+                global.logSystem(label + ' total ', _.round(_total, 2) + ' CPU');
+                console.log('\n');
+            }
         };
     } else {
         return {
