@@ -37,7 +37,7 @@ mod.LiteEvent = function(name) {
             this.handlers.slice(0).forEach(h => {
                 let b = startProfiling();
                 h(data);
-                b.checkCPU('(' + h + ')', 3);
+                b.checkCPU('(' + h + ')(' + data + ')', 3);
             });
         } catch(e){
             global.logError('Error in LiteEvent.trigger: ' + (e.stack || e));
@@ -347,31 +347,32 @@ mod.guid = function(){
         return v.toString(16);
     });
 };
-mod.checkCPU = function(name, limit, label, then) {
-    limit = limit ? limit : 0.1;
-    label = label ? label : '';
-    let now = Game.cpu.getUsed();
-    if (then && now - then > limit) {
-        global.logSystem(label + ' ' + name, 'used ' + _.round(now - then, 2) + ' CPU');
-        return true;
-    }
-    return false;
-};
 mod.startProfiling = function(label) {
     if (PROFILE) {
-        let now = Game.cpu.getUsed();
+        label = label ? label : '';
+        let start = Game.cpu.getUsed();
+        let _total = 0;
         return {
-            reset: () => now = Game.cpu.getUsed(),
             checkCPU: (name, limit) => {
-                let ret = checkCPU(name, limit, label, now);
-                now = Game.cpu.getUsed();
-                return ret;
-            }
+                limit = limit ? limit : 0.1;
+                const now = Game.cpu.getUsed();
+                const used = now - start;
+                _total += used;
+                start = now;
+                if (used > limit) {
+                    global.logSystem(label + ' ' + name, 'used ' + _.round(used, 2) + ' CPU');
+                    return true;
+                }
+                return false;
+            },
+            reset: () => then = Game.cpu.getUsed(),
+            total: () => global.logSystem(label + ' total ', _.round(_total, 2) + ' CPU')
         };
     } else {
         return {
+            checkCPU: () => {},
             reset: () => {},
-            checkCPU: () => {}
+            total: () => {}
         };
     }
 };
