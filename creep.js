@@ -217,6 +217,7 @@ mod.extend = function(){
     Creep.prototype.getPath = function( targetPos, ignoreCreeps ) {
         let range = undefined;
         let tempTarget = targetPos;
+        let maxRooms = 16; // screeps default
         if (ROUTE_PRECALCULATION && this.pos.roomName != targetPos.roomName) {
             var route = this.room.findRoute(targetPos.roomName);
             if ( route.length > 1 ) {
@@ -225,6 +226,8 @@ mod.extend = function(){
                 range = Math.min(24 - Math.abs(targetPos.x - 25), 24 - Math.abs(targetPos.y - 25));
                 ignoreCreeps = true;
                 if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, targetPos, range, getPath:'routePrecalc', Creep:'getPath'});
+            } else {
+                maxRooms = 1;
             }
         }
 
@@ -232,6 +235,7 @@ mod.extend = function(){
             serialize: true,
             ignoreCreeps: ignoreCreeps,
             range,
+            maxRooms: maxRooms
         });
         if( path && path.length > 4 )
             return path.substr(4);
