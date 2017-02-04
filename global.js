@@ -32,17 +32,17 @@ mod.LiteEvent = function(name) {
     };
     // call all registered subscribers
     this.trigger = function(data) {
-        let c = saveCPU();
+        let c = startProfiling();
         try{
             this.handlers.slice(0).forEach(h => {
-                let b = saveCPU();
+                let b = startProfiling();
                 h(data);
-                b.checkCPU('(' + this.name + ')' + '(' + h + ')', 5);
+                b.checkCPU('(' + h + ')', 3);
             });
         } catch(e){
             global.logError('Error in LiteEvent.trigger: ' + (e.stack || e));
         }
-        c.checkCPU('(' + this.name + ' total)(' + data + ')(' + this.handlers.length + ')', 10);
+        c.checkCPU('(' + this.name + ' total)(' + data + ')', 10);
     };
 };
 // Flag colors, used throughout the code
@@ -347,29 +347,30 @@ mod.guid = function(){
         return v.toString(16);
     });
 };
-mod.checkCPU = function(name, limit, then) {
+mod.checkCPU = function(name, limit, label, then) {
     limit = limit ? limit : 0.1;
+    label = label ? label : '';
     let now = Game.cpu.getUsed();
     if (then && now - then > limit) {
-        console.log(name, 'usedCpu:', now - then);
+        global.logSystem(label + ' ' + name, 'used ' + _.round(now - then, 2) + ' CPU');
         return true;
     }
     return false;
 };
-mod.saveCPU = function() {
+mod.startProfiling = function(label) {
     if (PROFILE) {
         let now = Game.cpu.getUsed();
         return {
-            saveCPU: () => now = Game.cpu.getUsed(),
+            reset: () => now = Game.cpu.getUsed(),
             checkCPU: (name, limit) => {
-                let ret = checkCPU(name, limit, now);
+                let ret = checkCPU(name, limit, label, now);
                 now = Game.cpu.getUsed();
                 return ret;
             }
         };
     } else {
         return {
-            saveCPU: () => {},
+            reset: () => {},
             checkCPU: () => {}
         };
     }
