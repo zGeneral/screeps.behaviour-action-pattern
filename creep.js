@@ -42,8 +42,11 @@ mod.extend = function(){
             }
             this.repairNearby();
             if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, Behaviour: behaviour && behaviour.name, Creep:'run'});
-            if( behaviour ) behaviour.run(this);
-            else if(!this.data){
+            let p = startProfiling(this.name);
+            if( behaviour ) {
+                behaviour.run(this);
+                p.checkCPU('behaviour.run', 5);
+            } else if(!this.data){
                 if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, Creep:'run'}, 'memory init');
                 let type = this.memory.setup;
                 let weight = this.memory.cost;
@@ -89,6 +92,7 @@ mod.extend = function(){
                         Population.countCreep(this.room, entry);
                     } else this.suicide();
                 }
+                p.checkCPU('!this.data');
             }
             if( this.flee ) {
                 this.fleeMove();
@@ -145,18 +149,19 @@ mod.extend = function(){
             (lastPos && // moved
             (lastPos.x != this.pos.x || lastPos.y != this.pos.y || lastPos.roomName != this.pos.roomName))
         ) {
-            let a = startProfiling(this.name);
+            let p2 = startProfiling(this.name);
             // at this point its sure, that the this DID move in the last loop.
             // from lastPos to this.pos
             this.room.recordMove(this);
-
+            p2.checkCPU('recordMove', 2);
             if( this.data.moveMode == null)
                 this.data.moveMode = 'auto';
             if( this.data.path && this.data.path.length > 1 )
                 this.data.path = this.data.path.substr(1);
-            else
+            else {
                 this.data.path = this.getPath( targetPos, true);
-
+                p2.checkCPU('getPath', 2);
+            }
             if( this.data.path && this.data.path.length > 0 ) {
                 const direction = +this.data.path.charAt(0);
                 const moveResult = this.move(direction);
@@ -165,15 +170,16 @@ mod.extend = function(){
                 } else logErrorCode(this, moveResult);
                 if( moveResult == ERR_NOT_FOUND ) delete this.data.path;
                 if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, direction, moveResult, drive:'ok', Creep:'drive'});
+                p2.checkCPU('move' + moveResult, 2);
             } else if( range > enoughRange ) {
                 this.say('NO PATH!');
                 this.data.targetId = null;
                 const leaveBorder = this.leaveBorder();
                 if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, leaveBorder, nopath: 'zero len', drive: 'nopath', Creep:'drive'});
             }
-            a.checkCPU('noMoveMode', 5);
+            p2.checkCPU('noMoveMode', 5);
         } else if( this.data.moveMode == 'auto' ) {
-            let a = startProfiling(this.name);
+            let p2 = startProfiling(this.name);
             // try again to use path.
             if( range > enoughRange ) {
                 this.honk();
@@ -195,16 +201,17 @@ mod.extend = function(){
                 const leaveBorder = this.leaveBorder();
                 if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, leaveBorder, nopath: 'blocked', drive: 'nopath', Creep:'drive'});
             }
-            a.checkCPU('moveMode:auto', 5);
+            p2.checkCPU('moveMode:auto', 5);
         } else { // evade
-            let a = startProfiling(this.name);
-            // get path (don't ignore thiss)
+            let p2 = startProfiling(this.name);
+            // get path (don't ignore this)
             // try to move.
             if( range > enoughRange ){
                 this.honkEvade();
                 delete this.data.path;
                 this.data.path = this.getPath( targetPos, false);
             }
+            p2.checkCPU('honk', 3);
             if( this.data.path && this.data.path.length > 0 ) {
                 if( this.data.path.length > 5 )
                     this.data.path = this.data.path.substr(0,4);
@@ -212,19 +219,20 @@ mod.extend = function(){
                 const moveResult = this.move(direction);
                 if( moveResult != OK ) logErrorCode(this, moveResult);
                 if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, direction, moveResult, drive:'evade', Creep:'drive'});
+                p2.checkCPU('evade.move' + moveResult, 3);
             } else if( range > enoughRange ){
                 this.say('NO PATH!');
                 this.data.targetId = null;
                 const leaveBorder = this.leaveBorder();
                 if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, leaveBorder, nopath:'evade', drive:'nopath', Creep:'drive'});
+                p2.checkCPU('evade', 3);
             }
-            a.checkCPU('evade', 5);
         }
         p.checkCPU('drive', 5);
     };
     Creep.prototype.getPath = function( targetPos, ignoreCreeps ) {
-        let p = startProfiling(this.name);
         let tempTarget = targetPos;
+        let p = startProfiling(this.name + this.pos + ' ' + targetPos);
         if (ROUTE_PRECALCULATION && this.pos.roomName != targetPos.roomName) {
             var route = this.room.findRoute(targetPos.roomName);
             if ( route.length > 0 )
@@ -313,6 +321,7 @@ mod.extend = function(){
         }
     };
     Creep.prototype.repairNearby = function( ) {
+        let p = startProfiling('repairNearby');
         // if it has energy and a work part
         if(this.carry.energy > 0 && this.hasActiveBodyparts(WORK)) {
             let nearby = this.pos.findInRange(this.room.structures.repairable, 3);
@@ -325,6 +334,7 @@ mod.extend = function(){
         } else {
             if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, Action:'repairing', Creep:'repairNearby'}, 'no WORK');
         }
+        p.checkCPU(this.name, 5);
     };
     
     Creep.prototype.controllerSign = function() {
