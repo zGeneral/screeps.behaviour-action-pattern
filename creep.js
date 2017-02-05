@@ -216,19 +216,20 @@ mod.extend = function(){
     };
     Creep.prototype.getPath = function( targetPos, ignoreCreeps ) {
         let range = undefined;
-        let tempTarget = targetPos;
+        let finalPos = targetPos;
         let maxRooms = 16; // screeps default
         let path;
         if (ROUTE_PRECALCULATION && this.pos.roomName != targetPos.roomName) {
             var route = this.room.findRoute(targetPos.roomName);
             if ( route.length > 1 ) {
                 targetPos = new RoomPosition(25, 25, route[1].room);
-                range = 24;
-                maxRooms = 2;
+                range = 23; // 23 avoids border swamp if possible
+                maxRooms = 3;
             } else {
-                maxRooms = 1;
+                maxRooms = 2;
             }
             const roomsOnPath = _.groupBy(route, 'room');
+            roomsOnPath[this.pos.roomName] = true;
             path = this.room.findPath(this.pos, targetPos, {
                 serialize: true,
                 ignoreCreeps,
@@ -238,7 +239,18 @@ mod.extend = function(){
                     return roomsOnPath[roomName] ? cost : mod.blockedRoom;
                 }
             });
-            if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, targetPos, range, path:path&&path.length, getPath:'route precalc', Creep:'getPath'});
+            if( !(path && path.length) ) {
+                maxRooms = 5;
+                path = this.room.findPath(this.pos, new RoomPosition(25, 25, route[0].room), {
+                    serialize: true,
+                    ignoreCreeps,
+                    range,
+                    maxRooms,
+                });
+                if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, pos:this.pos, finalPos, targetPos, range, maxRooms, route:_.keys(roomsOnPath), path:path&&path.length, getPath:'precalc failed', Creep:'getPath'});
+            } else {
+                if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, finalPos, targetPos, range, maxRooms, route:_.keys(roomsOnPath), path:path&&path.length, getPath:'route precalc', Creep:'getPath'});
+            }
         } else {
             path = this.room.findPath(this.pos, targetPos, {
                 serialize: true,
@@ -246,7 +258,7 @@ mod.extend = function(){
                 range,
                 maxRooms
             });
-            if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, targetPos, range, path:path&&path.length, getPath:'path', Creep:'getPath'});
+            if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, finalPos, targetPos, range, path:path&&path.length, getPath:'path', Creep:'getPath'});
         }
 
         if( path && path.length > 4 )
