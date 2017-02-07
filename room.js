@@ -1269,6 +1269,87 @@ mod.extend = function(){
 
         this.memory.hostileIds = this.hostileIds;
     };
+    Room.prototype.prepareResourceOrder = function(containerId, resourceType) {
+        let container = Game.getObjectById(containerId);
+        if (!this.my || !container || !container.room.name == this.name ||
+                !(container.structureType == STRUCTURE_LAB ||
+                container.structureType == STRUCTURE_CONTAINER ||
+                container.structureType == STRUCTURE_STORAGE ||
+                container.structureType == STRUCTURE_TERMINAL)) {
+            return ERR_INVALID_TARGET;
+        }
+        if (!RESOURCES_ALL.includes(resourceType)) {
+            return ERR_INVALID_ARGS;
+        }
+        if (this.memory.resources === undefined) {
+            this.memory.resources = {
+                lab: [],
+                container: [],
+                terminal: [],
+                storage: []
+            };
+        }
+        if (!this.memory.resources[container.structureType].find( (s) => s.id == containerId )) {
+            this.memory.resources[container.structureType].push({
+                id: containerId,
+                orders: []
+            });
+        }
+        if (container.structureType == STRUCTURE_LAB && amount > 0) {
+            // clear other resource types since labs only hold one at a time
+            this.memory.resources[STRUCTURE_LAB][containerId].forEach( (resource) => {
+                if (resource.resourceType != resourceType) {
+                    delete memory.resources[STRUCTURE_LAB][containerId][resource];
+                }
+            } );
+        }
+        return OK;
+    };
+    Room.prototype.placeOrder = function(containerId, resourceType, amount) {
+        let container = Game.getObjectById(containerId);
+        let ret = this.prepareResourceOrder(containerId, resourceType, amount);
+        if (ret != OK) {
+            return ret;
+        }
+
+        let containerData = this.memory.resources[container.structureType].find( (s) => s.id == containerId );
+        if ( containerData ) {
+            let existingOrder = containerData.orders.find( (r) => r.type == resourceType );
+            if ( existingOrder ) {
+                existingOrder.orderAmount += amount;
+                existingOrder.orderRemaining += amount;
+            } else {
+                containerData.orders.push({
+                    type: resourceType,
+                    orderAmount: amount,
+                    orderRemaining: amount,
+                    storeAmount: 0
+                });
+            }
+        }
+    };
+    Room.prototype.setStore = function(containerId, resourceType, amount) {
+        let container = Game.getObjectById(containerId);
+        let ret = this.prepareResourceOrder(containerId, resourceType, amount);
+        if (ret != OK) {
+            return ret;
+        }
+
+        let containerData = this.memory.resources[container.structureType].find( (s) => s.id == containerId );
+        if ( containerData ) {
+            let existingOrder = containerData.orders.find( (r) => r.type == resourceType );
+            if ( existingOrder ) {
+                existingOrder.storeAmount = amount;
+            } else {
+                containerData.orders.push({
+                    type: resourceType,
+                    orderAmount: 0,
+                    orderRemaining: 0,
+                    storeAmount: amount
+                });
+            }
+        }
+    };
 };
 mod.flush = function(){
     let clean = room => {
@@ -1514,8 +1595,4 @@ mod.fieldsInRange = function(args) {
     let minY = Math.max(...minusRangeY);
     let maxY = Math.min(...plusRangeY);
     return Room.validFields(args.roomName, minX, maxX, minY, maxY, args.checkWalkable, args.where);
-};
-mod.setLoadingAmount = function(roomName, containerId, resourceType, amount) {
-    var room = Game.rooms('roomName');
-    // TODO: implement the function
 };
