@@ -160,6 +160,43 @@ mod.extend = function(){
         });
     };
 
+    let Labs = function(room){
+        this.room = room;
+
+        Object.defineProperties(this, {
+            'all': {
+                configurable: true,
+                get: function() {
+                    if( _.isUndefined(this.room.memory.labs)) {
+                        this.room.saveLabs();
+                    }
+                    if( _.isUndefined(this._all) ){
+                        this._all = [];
+                        let add = entry => {
+                            let o = Game.getObjectById(entry.id);
+                            if( o ) {
+                                _.assign(o, entry);
+                                this._all.push(o);
+                            }
+                        };
+                        _.forEach(this.room.memory.labs, add);
+                    }
+                    return this._all;
+                }
+            },
+            'storage': {
+                configurable: true,
+                get: function() {
+                    if( _.isUndefined(this._storage) ) {
+                        let byType = l => l.storage == true;
+                        this._storage = this.all.filter(byType);
+                    }
+                    return this._storage;
+                }
+            }
+        });
+    };
+
     let Structures = function(room){
         this.room = room;
 
@@ -216,7 +253,7 @@ mod.extend = function(){
                                     // not decayable or below threshold
                                     ( !DECAYABLES.includes(structure.structureType) || (structure.hitsMax - structure.hits) > GAP_REPAIR_DECAYABLE ) &&
                                     // not pavement art
-                                    ( Memory.pavementArt[that.room.name] === undefined || Memory.pavementArt[that.room.name].indexOf('x'+structure.pos.x+'y'+structure.pos.y+'x') < 0 ) && 
+                                    ( Memory.pavementArt[that.room.name] === undefined || Memory.pavementArt[that.room.name].indexOf('x'+structure.pos.x+'y'+structure.pos.y+'x') < 0 ) &&
                                     // not flagged for removal
                                     ( !FlagDir.list.some(f => f.roomName == structure.pos.roomName && f.color == COLOR_ORANGE && f.x == structure.pos.x && f.y == structure.pos.y) )
                                 )
@@ -250,7 +287,7 @@ mod.extend = function(){
                                     structure.hits < MAX_FORTIFY_LIMIT[that.room.controller.level] &&
                                     ( structure.structureType != STRUCTURE_CONTAINER || structure.hits < MAX_FORTIFY_CONTAINER ) &&
                                     ( !DECAYABLES.includes(structure.structureType) || (structure.hitsMax - structure.hits) > GAP_REPAIR_DECAYABLE*3 ) &&
-                                    ( Memory.pavementArt[that.room.name] === undefined || Memory.pavementArt[that.room.name].indexOf('x'+structure.pos.x+'y'+structure.pos.y+'x') < 0 ) && 
+                                    ( Memory.pavementArt[that.room.name] === undefined || Memory.pavementArt[that.room.name].indexOf('x'+structure.pos.x+'y'+structure.pos.y+'x') < 0 ) &&
                                     ( !FlagDir.list.some(f => f.roomName == structure.pos.roomName && f.color == COLOR_ORANGE && f.x == structure.pos.x && f.y == structure.pos.y) )
                                 )
                             ),
@@ -288,6 +325,15 @@ mod.extend = function(){
                         this._links = new Links(this.room);
                     }
                     return this._links;
+                }
+            },
+            'labs' : {
+                configurable: true,
+                get: function() {
+                    if( _.isUndefined(this._labs) ){
+                        this._labs = new Labs(this.room);
+                    }
+                    return this._labs;
                 }
             }
         });
@@ -862,7 +908,7 @@ mod.extend = function(){
         if( sites.length == 0 ) return null;
         let siteOrder = CONSTRUCTION_PRIORITY;
         let rangeOrder = site => {
-            let order = siteOrder.indexOf(site.structureType); 
+            let order = siteOrder.indexOf(site.structureType);
             return pos.getRangeTo(site) + ( order < 0 ? 100000 : (order * 100) );
             //if( order < 0 ) return 100000 + pos.getRangeTo(site);
             //return ((order - (site.progress / site.progressTotal)) * 100) + pos.getRangeTo(site);
@@ -1018,6 +1064,40 @@ mod.extend = function(){
         };
         links.forEach(add);
     };
+    Room.prototype.saveLabs = function(){
+        if( _.isUndefined(this.memory.labs) ){
+            this.memory.labs = [];
+        }
+        let labs = this.find(FIND_MY_STRUCTURES, {
+            filter: (structure) => ( structure.structureType == STRUCTURE_LAB )
+        });
+        let storageLabs = this.storage ? this.storage.pos.findInRange(labs, 2).map(l => l.id) : [];
+
+        // for each memory entry, keep if existing
+        /*
+        let kept = [];
+        let keep = (entry) => {
+            if( links.find( (c) => c.id == entry.id )){
+                entry.storage = storageLinks.includes(entry.id);
+                kept.push(entry);
+            }
+        };
+        this.memory.links.forEach(keep);
+        this.memory.links = kept;
+        */
+        this.memory.labs = [];
+
+        // for each entry add to memory ( if not contained )
+        let add = (lab) => {
+            if( !this.memory.labs.find( (l) => l.id == lab.id ) ) {
+                this.memory.labs.push({
+                    id: lab.id,
+                    storage: storageLabs.includes(lab.id),
+                });
+            }
+        };
+        labs.forEach(add);
+    };
     Room.prototype.saveMinerals = function() {
         let that = this;
         let toPos = o => {
@@ -1151,7 +1231,7 @@ mod.extend = function(){
             // if invader id unregistered
             if( !that.memory.hostileIds.includes(creep.id) ){
                 // handle new invader
-                // register 
+                // register
                 that.memory.hostileIds.push(creep.id);
                 // save to trigger subscribers later
                 that.newInvader.push(creep)
@@ -1237,6 +1317,7 @@ mod.analyze = function(){
                 room.saveSpawns();
                 room.saveContainers();
                 room.saveLinks();
+                room.saveLabs();
                 room.terminalBroker();
             }
             room.roadConstruction();
@@ -1248,7 +1329,7 @@ mod.analyze = function(){
             console.log( dye(CRAYON.error, 'Error in room.js (Room.prototype.loop) for "' + room.name + '": <br/>' + (err.stack || err.toString()) + '<br/>' + err.stack));
         }
     };
-    _.forEach(Game.rooms, getEnvironment);        
+    _.forEach(Game.rooms, getEnvironment);
 };
 mod.execute = function() {
     let triggerNewInvaders = creep => {
@@ -1290,12 +1371,12 @@ mod.findSpawnRoom = function(params){
     if( !params || !params.targetRoom ) return null;
     // filter validRooms
     let isValidRoom = room => (
-        room.my && 
+        room.my &&
         (params.minEnergyCapacity === undefined || params.minEnergyCapacity <= room.energyCapacityAvailable) &&
         (params.minEnergyAvailable === undefined || params.minEnergyAvailable <= room.energyAvailable) &&
         (room.name != params.targetRoom || params.allowTargetRoom === true) &&
-        (params.minRCL === undefined || room.controller.level >= params.minRCL) && 
-        (params.callBack === undefined || params.callBack(room)) 
+        (params.minRCL === undefined || room.controller.level >= params.minRCL) &&
+        (params.callBack === undefined || params.callBack(room))
     );
     let validRooms = _.filter(Game.rooms, isValidRoom);
     if( validRooms.length == 0 ) return null;
@@ -1304,7 +1385,7 @@ mod.findSpawnRoom = function(params){
     let queueTime = queue => _.sum(queue, c => (c.parts.length*3));
     let roomTime = room => ((queueTime(room.spawnQueueLow)*0.9) + queueTime(room.spawnQueueMedium) + (queueTime(room.spawnQueueHigh)*1.1) ) / room.structures.spawns.length;
     let evaluation = room => { return routeRange(room.name, params.targetRoom) +
-        ( (8-room.controller.level) / (params.rangeRclRatio||3) ) + 
+        ( (8-room.controller.level) / (params.rangeRclRatio||3) ) +
         ( roomTime(room) / (params.rangeQueueRatio||51) );
     }
     return _.min(validRooms, evaluation);
@@ -1433,4 +1514,8 @@ mod.fieldsInRange = function(args) {
     let minY = Math.max(...minusRangeY);
     let maxY = Math.min(...plusRangeY);
     return Room.validFields(args.roomName, minX, maxX, minY, maxY, args.checkWalkable, args.where);
+};
+mod.setLoadingAmount = function(roomName, containerId, resourceType, amount) {
+    var room = Game.rooms('roomName');
+    // TODO: implement the function
 };
