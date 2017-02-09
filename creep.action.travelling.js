@@ -22,8 +22,12 @@ action.step = function(creep){
                 targetRange = 24;
                 pos = new RoomPosition(25, 25, creep.data.travelRoom);
             }
+            if( creep.pos.roomName === pos.roomName ) {
+                delete creep.target;
+                delete creep.data.travelRoom;
+                delete creep.data.travelPos;
+            }
         }
-        if( creep.target.id == creep.id ) pos = new RoomPosition(25, 25, creep.data.travelRoom);
         else pos = creep.target.pos;
         creep.drive( pos, this.reachedRange, targetRange, Infinity );
     }
