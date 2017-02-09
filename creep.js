@@ -244,7 +244,7 @@ mod.extend = function(){
                 if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, finalPos, targetPos, range, maxRooms, route:_.keys(roomsOnPath), path, getPath:'route precalc', Creep:'getPath'});
             }
         } else {
-            path = mod.search(this.pos, targetPos, 1, ignoreCreeps, maxRooms);
+            path = mod.search(this.pos, targetPos, range, ignoreCreeps, maxRooms);
             if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, finalPos, targetPos, range, path:path&&path.length, getPath:'path', Creep:'getPath'});
         }
 
@@ -544,7 +544,7 @@ mod.directionAtPosition = function(origin, position) {
 };
 mod.search = function(pos, targetPos, range, ignoreCreeps, maxRooms, roomsOnPath) {
     let callbackMaxRooms = maxRooms;
-    const rawPath = PathFinder.search(pos, {pos: targetPos, range}, {
+    const rawPath = PathFinder.search(pos, {pos: targetPos, range: range || 1}, {
         swampCost: 10, // ignoreRoads ? 5 : 10,
         plainCost: 2, // ignoreRoads ? 1 : 2,
         maxOps: 5000,
@@ -564,5 +564,12 @@ mod.search = function(pos, targetPos, range, ignoreCreeps, maxRooms, roomsOnPath
         }
     });
     // TODO check incomplete / ops / etc
+    if (range === undefined) {
+        if (rawPath && _.isArray(rawPath.path)) {
+            rawPath.path.push(targetPos);
+        } else {
+            logError('path search error', {pos, targetPos, range, ignoreCreeps, maxRooms, roomsOnPath, stack: new Error().stack});
+        }
+    }
     return mod.serializePath(pos, rawPath.path); // TODO targetPos end?
 }
