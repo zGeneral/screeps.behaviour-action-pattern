@@ -225,10 +225,6 @@ mod.extend = function(){
                 targetPos = new RoomPosition(25, 25, route[1].room);
                 range = 23; // 23 avoids border swamp if possible
                 maxRooms = 3;
-            } else if( route.length ) {
-                targetPos = new RoomPosition(25, 25, route[0].room);
-                range = 23;
-                maxRooms = 2;
             } else {
                 maxRooms = 2;
             }
