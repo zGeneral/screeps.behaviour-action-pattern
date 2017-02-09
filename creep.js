@@ -230,23 +230,7 @@ mod.extend = function(){
             }
             const roomsOnPath = _.groupBy(route, 'room');
             roomsOnPath[this.pos.roomName] = true;
-            path = this.room.findPath(this.pos, targetPos, {
-                serialize: true,
-                ignoreCreeps,
-                range,
-                maxRooms,
-                costCallback: function (roomName, cost) {
-                    const result = roomsOnPath[roomName] && cost || false;
-                    if (!result) {
-                        for(let x = 50; x >= 0; x--) {
-                            for(let y = 50; y >= 0; y--) {
-                                cost.set(x,y,Infinity);
-                            }
-                        }
-                    }
-                    return result;
-                },
-            });
+            path = mod.search(this.pos, targetPos, range, ignoreCreeps, maxRooms, roomsOnPath);
             if( !(path && path.length) ) {
                 maxRooms = 5;
                 path = this.room.findPath(this.pos, new RoomPosition(25, 25, route[0].room), {
@@ -260,18 +244,11 @@ mod.extend = function(){
                 if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, finalPos, targetPos, range, maxRooms, route:_.keys(roomsOnPath), path, getPath:'route precalc', Creep:'getPath'});
             }
         } else {
-            path = this.room.findPath(this.pos, targetPos, {
-                serialize: true,
-                ignoreCreeps,
-                range,
-                maxRooms
-            });
+            path = mod.search(this.pos, targetPos, 1, ignoreCreeps, maxRooms);
             if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, finalPos, targetPos, range, path:path&&path.length, getPath:'path', Creep:'getPath'});
         }
 
-        if( path && path.length > 4 )
-            return path.substr(4);
-        else return null;
+        return path;
     };
     Creep.prototype.fleeMove = function() {
         if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, Action:'fleeMove', Creep:'run'});
@@ -531,3 +508,61 @@ mod.register = function() {
         if (Creep.setup[setup].register) Creep.setup[setup].register(this);
     }
 };
+mod.serializePath = function(startPos, path) {
+    if (!_.isArray(path)) {
+        return;
+    }
+
+    let result = '';
+    if (!path.length) {
+        return result; // TODO adjacent pathing?
+    }
+
+    let lastPos = startPos;
+    for (let i = 0; i < path.length; i++) {
+        if (path[i].roomName === lastPos.roomName) {
+            result = result + mod.directionAtPosition(lastPos, path[i]);
+        }
+        lastPos = path[i];
+    }
+
+    return result;
+};
+mod.positionAtDirection = function(origin, direction) {
+    let offsetX = [0, 0, 1, 1, 1, 0, -1, -1, -1];
+    let offsetY = [0, -1, -1, 0, 1, 1, 1, 0, -1];
+    return new RoomPosition(origin.x + offsetX[direction], origin.y + offsetY[direction], origin.roomName);
+};
+const posToDirMap = [
+    [ TOP_LEFT,     TOP,    TOP_RIGHT ], // y, x
+    [ LEFT,         0,      RIGHT ],
+    [ BOTTOM_LEFT,  BOTTOM, BOTTOM_RIGHT],
+];
+mod.directionAtPosition = function(origin, position) {
+    const dirRow = posToDirMap[1 + position.y - origin.y] || [];
+    return dirRow[1 + position.x - origin.x];
+};
+mod.search = function(pos, targetPos, range, ignoreCreeps, maxRooms, roomsOnPath) {
+    let callbackMaxRooms = maxRooms;
+    const rawPath = PathFinder.search(pos, {pos: targetPos, range}, {
+        swampCost: 10, // ignoreRoads ? 5 : 10,
+        plainCost: 2, // ignoreRoads ? 1 : 2,
+        maxOps: 5000,
+        roomCallback: function(roomName) {
+            if (roomsOnPath && !roomsOnPath[roomName]) {
+                return false;
+            }
+            if (--callbackMaxRooms < 0) {
+                return false;
+            }
+            const room = Game.rooms[roomName];
+            if (ignoreCreeps || !room || room.controller && room.controller.safeMode) {
+                return Room.getCostMatrix(roomName);
+            } else {
+                return room.currentCostMatrix;
+            }
+        }
+    });
+    // TODO check incomplete / ops / etc
+    return mod.serializePath(pos, rawPath.path); // TODO targetPos end?
+}

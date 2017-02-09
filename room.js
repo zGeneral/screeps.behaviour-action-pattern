@@ -645,38 +645,14 @@ mod.extend = function(){
         'costMatrix': {
             configurable: true,
             get: function () {
-                if( _.isUndefined(Memory.pathfinder)) Memory.pathfinder = {};
-                if( _.isUndefined(Memory.pathfinder[this.name])) Memory.pathfinder[this.name] = {};
-
-                const ttl = Game.time - Memory.pathfinder[this.name].updated;
-                if( Memory.pathfinder[this.name].costMatrix && ttl < COST_MATRIX_VALIDITY) {
-                    if( DEBUG && TRACE ) trace('PathFinder', {roomName:this.name, ttl, PathFinder:'CostMatrix'}, 'cached costmatrix');
-                    return PathFinder.CostMatrix.deserialize(Memory.pathfinder[this.name].costMatrix);
-                }
-
-                if( DEBUG ) logSystem(this.name, 'Calulating cost matrix');
-                var costMatrix = new PathFinder.CostMatrix;
-                let setCosts = structure => {
-                    if(structure.structureType == STRUCTURE_ROAD) {
-                        costMatrix.set(structure.pos.x, structure.pos.y, 1);
-                    } else if(structure.structureType !== STRUCTURE_RAMPART || !structure.isPublic ) {
-                        costMatrix.set(structure.pos.x, structure.pos.y, 0xFF);
-                    }
-                };
-                this.structures.all.forEach(setCosts);
-
-                const prevTime = Memory.pathfinder[this.name].updated;
-                Memory.pathfinder[this.name].costMatrix = costMatrix.serialize();
-                Memory.pathfinder[this.name].updated = Game.time;
-                if( DEBUG && TRACE ) trace('PathFinder', {roomName:this.name, prevTime, structures:this.structures.all.length, PathFinder:'CostMatrix'}, 'updated costmatrix');
-                return costMatrix;
+                return mod.getCostMatrix(this.name);
             }
         },
         'currentCostMatrix': {
             configurable: true,
             get: function () {
                 if (_.isUndefined(this._currentCostMatrix) ) {
-                    let costs = this.costMatrix;
+                    let costs = this.costMatrix.clone();
                     // Avoid creeps in the room
                     this.allCreeps.forEach(function(creep) {
                         costs.set(creep.pos.x, creep.pos.y, 0xff);
@@ -854,6 +830,8 @@ mod.extend = function(){
             }
         });
     };
+
+    Room.getCostMatrix = mod.getCostMatrix;
 
     Room.prototype.getBestConstructionSiteFor = function(pos, filter = null) {
         let sites;
@@ -1306,11 +1284,6 @@ mod.findSpawnRoom = function(params){
     }
     return _.min(validRooms, evaluation);
 };
-mod.getCostMatrix = function(roomName) {
-    var room = Game.rooms[roomName];
-    if(!room) return;
-    return room.costMatrix;
-};
 mod.isMine = function(roomName) {
     let room = Game.rooms[roomName];
     return( room && room.my );
@@ -1389,9 +1362,37 @@ mod.roomDistance = function(roomName1, roomName2, diagonal, continuous){
     return xDif + yDif; // count diagonal as 2
 };
 mod.getCostMatrix = function(roomName) {
-    var room = Game.rooms[roomName];
-    if(!room) return;
-    return room.costMatrix;
+    if( _.isUndefined(Memory.pathfinder)) Memory.pathfinder = {};
+    if( _.isUndefined(Memory.pathfinder[roomName])) Memory.pathfinder[roomName] = {};
+
+    const room = Game.rooms[roomName];
+    const ttl = Game.time - Memory.pathfinder[roomName].updated;
+    if( Memory.pathfinder[roomName].costMatrix
+            && ttl < COST_MATRIX_VALIDITY ) {
+        if( DEBUG && TRACE ) trace('PathFinder', {roomName, ttl, PathFinder:'CostMatrix'}, 'cached costmatrix');
+        return PathFinder.CostMatrix.deserialize(Memory.pathfinder[roomName].costMatrix);
+    }
+
+    if (room) {
+        var costMatrix = new PathFinder.CostMatrix;
+
+        if( DEBUG ) logSystem(roomName, 'Calulating cost matrix');
+        let setCosts = structure => {
+            if(structure.structureType == STRUCTURE_ROAD) {
+                costMatrix.set(structure.pos.x, structure.pos.y, 1);
+            } else if(structure.structureType !== STRUCTURE_RAMPART || !(structure.isPublic || structure.my) ) {
+                costMatrix.set(structure.pos.x, structure.pos.y, 0xFF);
+            }
+        };
+        room.structures.all.forEach(setCosts);
+        const prevTime = Memory.pathfinder[roomName].updated;
+        Memory.pathfinder[roomName].costMatrix = costMatrix.serialize();
+        Memory.pathfinder[roomName].updated = Game.time;
+        if( DEBUG && TRACE ) trace('PathFinder', {roomName, prevTime, structures:room.structures.all.length, PathFinder:'CostMatrix'}, 'updated costmatrix');
+
+        return costMatrix;
+    }
+    // unset values / undefined reads from map
 };
 mod.validFields = function(roomName, minX, maxX, minY, maxY, checkWalkable = false, where = null) {
     let look;
