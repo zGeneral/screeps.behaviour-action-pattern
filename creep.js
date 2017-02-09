@@ -225,6 +225,10 @@ mod.extend = function(){
                 targetPos = new RoomPosition(25, 25, route[1].room);
                 range = 23; // 23 avoids border swamp if possible
                 maxRooms = 3;
+            } else if( route.length ) {
+                targetPos = new RoomPosition(25, 25, route[0].room);
+                range = 23;
+                maxRooms = 2;
             } else {
                 maxRooms = 2;
             }
@@ -236,8 +240,8 @@ mod.extend = function(){
                 range,
                 maxRooms,
                 costCallback: function (roomName, cost) {
-                    return roomsOnPath[roomName] ? cost : mod.blockedRoom;
-                }
+                    return roomsOnPath[roomName] && cost || false;
+                },
             });
             if( !(path && path.length) ) {
                 maxRooms = 5;
@@ -523,5 +527,3 @@ mod.register = function() {
         if (Creep.setup[setup].register) Creep.setup[setup].register(this);
     }
 };
-const ffBlock = _.fill(new Array(616), 4294967295);
-mod.blockedRoom = PathFinder.CostMatrix.deserialize(ffBlock);
