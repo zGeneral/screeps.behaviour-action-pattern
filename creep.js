@@ -236,7 +236,15 @@ mod.extend = function(){
                 range,
                 maxRooms,
                 costCallback: function (roomName, cost) {
-                    return roomsOnPath[roomName] && cost || false;
+                    const result = roomsOnPath[roomName] && cost || false;
+                    if (!result) {
+                        for(let x = 50; x >= 0; x--) {
+                            for(let y = 50; y >= 0; y--) {
+                                cost.set(x,y,Infinity);
+                            }
+                        }
+                    }
+                    return result;
                 },
             });
             if( !(path && path.length) ) {
@@ -249,7 +257,7 @@ mod.extend = function(){
                 });
                 if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, pos:this.pos, finalPos, targetPos, range, maxRooms, route:_.keys(roomsOnPath), path:path&&path.length, getPath:'precalc failed', Creep:'getPath'});
             } else {
-                if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, finalPos, targetPos, range, maxRooms, route:_.keys(roomsOnPath), path:path&&path.length, getPath:'route precalc', Creep:'getPath'});
+                if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, finalPos, targetPos, range, maxRooms, route:_.keys(roomsOnPath), path, getPath:'route precalc', Creep:'getPath'});
             }
         } else {
             path = this.room.findPath(this.pos, targetPos, {
