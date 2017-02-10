@@ -508,7 +508,8 @@ mod.register = function() {
         if (Creep.setup[setup].register) Creep.setup[setup].register(this);
     }
 };
-mod.serializePath = function(startPos, path) {
+mod.serializePath = function(startPos, rawPath) {
+    const path = rawPath.path;
     if (!_.isArray(path)) {
         return;
     }
@@ -521,7 +522,12 @@ mod.serializePath = function(startPos, path) {
     let lastPos = startPos;
     for (let i = 0; i < path.length; i++) {
         if (path[i].roomName === lastPos.roomName) {
-            result = result + mod.directionAtPosition(lastPos, path[i]);
+            const step = mod.directionAtPosition(lastPos, path[i]);
+            if (step) {
+                result = result + step;
+            // } else {
+            //     console.log(JSON.stringify(rawPath));
+            }
         }
         lastPos = path[i];
     }
@@ -571,5 +577,8 @@ mod.search = function(pos, targetPos, range, ignoreCreeps, maxRooms, roomsOnPath
             logError('path search error', {pos, targetPos, range, ignoreCreeps, maxRooms, roomsOnPath, stack: new Error().stack});
         }
     }
-    return mod.serializePath(pos, rawPath.path); // TODO targetPos end?
-}
+    const path = mod.serializePath(pos, rawPath);
+    if (path && path.length) {
+        return path;
+    }
+};
