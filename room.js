@@ -1152,6 +1152,39 @@ mod.extend = function(){
             filledStorage.forEach(handleFilledStorage);
         }
     };
+    Room.prototype.updateResourceOrders = function () {
+        let data = this.memory.resources;
+        if (!this.my || !data) return;
+
+        for(var structureType in data) {
+            for(var i=0;i<data[structureType].length;i++) {
+                let structure = data[structureType][i];
+                for(var j=0;j<structure.orders.length;j++) {
+                    let order = structure.orders[j];
+                    if (order.orderRemaining < order.orderAmount) {
+                        let baseAmount = 0;
+                        if (structureType == STRUCTURE_STORAGE) baseAmount = order.type == RESOURCE_ENERGY ? MIN_STORAGE_ENERGY[rcl] : MAX_STORAGE_MINERAL;
+                        else if (structureType == STRUCTURE_TERMINAL) baseAmount = order.type == RESOURCE_ENERGY ? TERMINAL_ENERGY : 0;
+                        let unloadAmount = baseAmount + order.storeAmount + order.orderAmount;
+                        let amount = 0;
+                        let cont = Game.getObjectById(structure.id);
+                        if (cont && structureType == STRUCTURE_LAB) {
+                            // get lab amount
+                            if (cont.mineralType == order.type) {
+                                amount = cont.mineralAmount;
+                            }
+                        } else if (cont) {
+                            // get stored amount
+                            amount = cont.store[order.type] || 0;
+                        }
+                        if (unloadAmount > amount) {
+                            order.orderAmount = Math.max(amount-baseAmount-order.storeAmount,order.orderRemaining,0);
+                        }
+                    }
+                }
+            }
+        }
+    }
     Room.prototype.terminalBroker = function () {
         if( !this.my || !this.terminal ) return;
         let that = this;
@@ -1297,11 +1330,14 @@ mod.extend = function(){
         }
         if (container.structureType == STRUCTURE_LAB && amount > 0) {
             // clear other resource types since labs only hold one at a time
-            this.memory.resources[STRUCTURE_LAB][containerId].forEach( (resource) => {
-                if (resource.resourceType != resourceType) {
-                    delete memory.resources[STRUCTURE_LAB][containerId][resource];
+            let orders = this.memory.resources[STRUCTURE_LAB].find((s)=>s.id==containerId).orders;
+            for (var i=0;i<orders.length;i++) {
+                if (orders[i].type != resourceType && orders[i].type != RESOURCE_ENERGY) {
+                    orders[i].orderAmount = 0;
+                    orders[i].orderRemaining = 0;
+                    orders[i].storeAmount = 0;
                 }
-            } );
+            };
         }
         return OK;
     };
@@ -1327,6 +1363,7 @@ mod.extend = function(){
                 });
             }
         }
+        return OK;
     };
     Room.prototype.setStore = function(containerId, resourceType, amount) {
         let container = Game.getObjectById(containerId);
@@ -1349,6 +1386,7 @@ mod.extend = function(){
                 });
             }
         }
+        return OK;
     };
 };
 mod.flush = function(){
@@ -1399,6 +1437,7 @@ mod.analyze = function(){
                 room.saveContainers();
                 room.saveLinks();
                 room.saveLabs();
+                room.updateResourceOrders();
                 room.terminalBroker();
             }
             room.roadConstruction();
