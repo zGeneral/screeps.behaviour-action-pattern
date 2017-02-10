@@ -2,112 +2,503 @@ let action = new Creep.Action('reallocating');
 module.exports = action;
 action.maxPerTarget = 1;
 action.maxPerAction = 1;
-action.terminalMineralTotal = function(terminal){
-    // Minerals stored in terminal
-    return terminal.sum-terminal.store.energy;
-}
-action.terminalMineralSpace = function(terminal){
-    // Space for minerals in terminal
-    return terminal.storeCapacity-TERMINAL_ENERGY*1.05;
+// get<containerType>State functions return a positive value when they need filling, a negative value when they need emptying, and 0 when "close enough"
+action.terminalNeeds = function(terminal, resourceType){
+    var ret = 0;
+    if (!terminal || !terminal.room.memory.resources) return 0;
+    let terminalData = terminal.room.memory.resources.terminal[0];
+    // look up resource and calculate needs
+    let order = null;
+    if (terminalData) order = terminalData.orders.find((o)=>{return o.type==resourceType;});
+    if (!order) order = { orderAmount: 0, orderRemaining: 0, storeAmount: 0 };
+    let loadTarget = order.orderRemaining + order.storeAmount + (resourceType == RESOURCE_ENERGY) ? TERMINAL_ENERGY : 0;
+    let unloadTarget = order.orderAmount + order.storeAmount + (resourceType == RESOURCE_ENERGY) ? TERMINAL_ENERGY : 0;
+    let store = terminal.store[resourceType];
+    if (store < loadTarget) ret = Math.min(loadTarget-store,terminal.storeCapacity-terminal.sum);
+    else if (store > unloadTarget*1.05) ret = unloadTarget-store;
+    return ret;
+};
+action.storageNeeds = function(storage, resourceType){
+    var ret = 0;
+    if (!storage || !storage.room.memory.resources) return 0;
+
+    let storageData = storage.room.memory.resources.storage[0];
+    // look up resource and calculate needs
+    let order = null;
+    if (storageData) order = storageData.orders.find((o)=>{return o.type==resourceType;});
+    if (!order) order = { orderAmount: 0, orderRemaining: 0, storeAmount: 0 };
+    let rcl = storage.room.controller.level;
+    let loadTarget = order.orderRemaining + order.storeAmount + (resourceType == RESOURCE_ENERGY) ? MIN_STORAGE_ENERGY[rcl] : MAX_STORAGE_MINERAL;
+    // storage always wants energy
+    let unloadTarget = (resourceType == RESOURCE_ENERGY) ? storage.storeCapacity : order.orderAmount + order.storeAmount + MAX_STORAGE_MINERAL;
+    let store = storage.store[resourceType];
+    if (store < loadTarget) ret = Math.min(loadTarget-store,storage.storeCapacity-storage.sum);
+    else if (store > unloadTarget*1.05) ret = unloadTarget-store;
+//    console.log(storage,resourceType,store,loadTarget,unloadTarget,ret)
+    return ret;
+};
+action.containerNeeds = function(container, resourceType){
+    if (!container || !container.room.memory.resources) return 0;
+
+    // look up resource and calculate needs
+    let containerData = container.room.memory.resources.container.find( (s) => s.id == container.id );
+    if (containerData) {
+        let order = containerData.orders.find((o)=>{return o.type==resourceType;});
+        if (order) {
+            let loadTarget = order.orderRemaining + order.storeAmount;
+            let unloadTarget = order.orderAmount + order.storeAmount;
+            let store = container.store[resourceType] || 0;
+            if (store < loadTarget) return Math.min(loadTarget-store,container.storeCapacity-container.sum);
+            if (store > unloadTarget*1.05) return unloadTarget-store;
+        }
+    }
+    return 0;
+};
+action.labNeeds = function(lab, resourceType){
+    if (!lab || !lab.room.memory.resources) return 0;
+
+    // look up resource and calculate needs
+    let containerData = lab.room.memory.resources.lab.find( (s) => s.id == lab.id );
+    if (containerData) {
+        let order = containerData.orders.find((o)=>{return o.type==resourceType;});
+        if (order) {
+            let loadTarget = order.orderRemaining + order.storeAmount;
+            let unloadTarget = order.orderAmount + order.storeAmount;
+            let store = 0;
+            let space = 0;
+            if (resourceType == RESOURCE_ENERGY) {
+                store = lab.energy;
+                space = lab.energyCapacity-lab.energy;
+            } else {
+                store = lab.mineralType == resourceType ? lab.mineralAmount : 0;
+                space = lab.mineralCapacity-lab.mineralAmount;
+            }
+            if (store < loadTarget) return Math.min(loadTarget-store,space);
+            if (store > unloadTarget*1.05) return unloadTarget-store;
+        }
+    }
+    return 0;
+};
+action.getLabOrder = function(lab) {
+    if (!lab) return null;
+    var order = null;
+    let room = lab.room;
+
+    let data = room.memory.resources.lab.find( (s) => s.id == lab.id );
+    if (data) {
+        let orders = data.orders;
+        for (var i=0;i<orders.length;i++) {
+            if (orders[i].type != RESOURCE_ENERGY &&
+                    (orders[i].orderRemaining > 0 ||
+                    orders[i].storeAmount > 0)) {
+                order = orders[i];
+                break;
+            }
+        }
+    }
+
+    return order;
+};
+action.findNeeding = function(room, resourceType, amountMin){
+    if (!amountMin) amountMin = 1;
+//    if (!RESOURCES_ALL.find((r)=>{r==resourceType;})) return ERR_INVALID_ARGS;
+
+    let data = room.memory;
+    if (data) {
+        if (data.labs.length > 0) {
+            for (var i=0;i<data.labs.length;i++) {
+                let d = data.labs[i];
+                let lab = Game.getObjectById(d.id);
+                let amount = this.labNeeds(lab,resourceType);
+                if (amount >= amountMin && (lab.mineralAmount == 0 || lab.mineralType == resourceType))
+                    return { structure: lab, amount: amount};
+            }
+        }
+        if (data.container.length > 0) {
+            for (var i=0;i<data.container.length;i++) {
+                let d = data.container[i];
+                let container = Game.getObjectById(d.id);
+                let amount = this.containerNeeds(container,resourceType);
+                if (amount >= amountMin) return { structure: container, amount: amount };
+            }
+        }
+    }
+    let terminal = room.terminal;
+    if (terminal) {
+        let amount = this.terminalNeeds(terminal,resourceType);
+        if (amount >= amountMin) return { structure: terminal, amount: amount };
+    }
+    let storage = room.storage;
+    if (storage) {
+        let amount = this.storageNeeds(storage,resourceType);
+        if (amount >= amountMin) return { structure: storage, amount: amount };
+    }
+
+    // no specific needs found ... check for overflow availability
+    if (storage && (resourceType == RESOURCE_ENERGY || resourceType == RESOURCE_POWER) && storage.storeCapacity-storage.sum > amountMin)
+        return { structure: storage, amount: 0 };
+    if (terminal && resourceType != RESOURCE_ENERGY && resourceType != RESOURCE_POWER && terminal.storeCapacity-terminal.sum > amountMin)
+        return { structure: terminal, amount: 0 };
+
+    // no destination found
+    return null;
+};
+action.findContainerWith = function(room, resourceType, amountMin) {
+    if (!amountMin) amountMin = 1;
+//    if (!RESOURCES_ALL.find((r)=>{r==resourceType;})) return ERR_INVALID_ARGS;
+
+    let data = room.memory;
+    if (data.container.length > 0) {
+        for (var i=0;i<data.container.length;i++) {
+            let d = data.container[i];
+            let container = Game.getObjectById(d.id);
+            if (container.store[resourceType]) {
+                let amount = container.store[resourceType];
+                if (amount >= amountMin) return { structure: container, amount: amount };
+            }
+        }
+    }
+
+    // no container with enough resource found
+    return null;
 }
 action.isValidAction = function(creep){
-    return creep.room.storage && creep.room.terminal &&
-        ( this.isValidMineralToTerminal(creep) ||
-        this.isValidEnergyToStorage(creep) ||
-        this.isValidMineralToStorage(creep) );
+    return true;
 };
-action.isValidMineralToTerminal = function(creep){
-    let room = creep.room;
-    let storage = room.storage;
-    let terminal = room.terminal;
-    // Don't store any more minerals in the terminal or there won't be space for energy!
-    if(terminal.store.energy < TERMINAL_ENERGY && this.terminalMineralTotal(terminal) >= this.terminalMineralSpace(terminal) ) return false;
-    return ( storage.store[room.mineralType] &&
-        (storage.store[creep.room.mineralType] + (creep.carry[room.mineralType] || 0)) > MAX_STORAGE_MINERAL*1.05 &&
-        (terminal.sum - terminal.store.energy + Math.max(terminal.store.energy, TERMINAL_ENERGY)) < terminal.storeCapacity);
-};
-action.isValidEnergyToStorage = function(creep){
-    return creep.room.terminal.store.energy + creep.carry.energy > TERMINAL_ENERGY * 1.05;
-};
-action.isValidMineralToStorage = function(creep){
-    let terminal = creep.room.terminal;
-    // Don't store any more minerals in the terminal or there won't be space for energy!
-    if(this.terminalMineralTotal(terminal) >= this.terminalMineralSpace(terminal)) return true;
-    let mineral = terminal.store[creep.room.mineralType] || 0;
-    return terminal.sum > mineral + terminal.store.energy;
+action.isValidTarget = function(target){
+    return true;
 };
 action.isAddableAction = function(creep){
     let pop = creep.room.population;
     return creep.sum == 0 &&(!pop || !pop.actionCount[this.name] || pop.actionCount[this.name] < this.maxPerAction);
 };
-action.isValidTarget = function(target){
-    return true;
-};
 action.isAddableTarget = function(target){
     return true;
 };
 action.newTarget = function(creep){
-    let terminal = creep.room.terminal;
-    if( (creep.sum == 0) == (terminal.store.energy > TERMINAL_ENERGY*1.05 || this.isValidMineralToStorage(creep)) ) return terminal;
-    else return creep.room.storage;
+    let room = creep.room;
+    var target = null;
+    if( creep.sum == 0) {
+        let data = room.memory;
+        if (data) {
+            // check labs for needs and make sure to empty the lab before filling
+            if (data.labs.length > 0) {
+                for (var i=0;i<data.labs.length;i++) {
+                    let d = data.labs[i];
+                    let lab = Game.getObjectById(d.id);
+                    var amount = 0;
+                    if (lab.mineralAmount > 0) {
+                        amount = this.labNeeds(lab,lab.mineralType);
+                        if (amount < 0) {
+                            // lab has extra resource to be taken elsewhere
+                            console.log(creep,lab,"has extra",lab.mineralType);
+                            if (this.findNeeding(room,lab.mineralType)) return lab;
+                        }
+                        if (amount > 0) {
+                            // lab needs more resource so find a lower priority container with some
+                            console.log(creep,lab,"needs",amount,lab.mineralType);
+                            if (room.storage.store[lab.mineralType]) return room.storage;
+                            if (room.terminal.store[lab.mineralType]) return room.terminal;
+                            let ret = this.findContainerWith(room, lab.mineralType);
+                            console.log(creep,lab,"found some in",ret.structure)
+                            if (ret) return ret.structure;
+                        }
+                    } else {
+                        // lab is empty so check and fill order
+                        let order = this.getLabOrder(lab);
+                        let resourceType = null;
+                        if (order) {
+                            // found an order
+                            resourceType = order.type;
+                            console.log(creep,lab,"needs",order.orderRemaining+order.storeAmount,resourceType);
+                            if (room.storage.store[resourceType]) return room.storage;
+                            if (room.terminal.store[resourceType]) return room.terminal;
+                            let ret = this.findContainerWith(room, resourceType);
+                            if (ret) return ret.structure;
+                        }
+                    }
+                    amount = this.labNeeds(lab,RESOURCE_ENERGY);
+                    if (amount < 0) {
+                        // lab has extra energy (I guess ...)
+                        console.log(creep,lab,"has extra energy");
+                        if (this.findNeeding(room, RESOURCE_ENERGY)) return lab;
+                    }
+                    if (amount > 0) {
+                        // lab needs energy so find a lower priority container with some
+                        console.log(creep,lab,"needs",amount,RESOURCE_ENERGY);
+                        if (room.storage.store[RESOURCE_ENERGY]) return room.storage;
+                        if (room.terminal.store[RESOURCE_ENERGY]) return room.terminal;
+                        let ret = this.findContainerWith(room, RESOURCE_ENERGY);
+                        if (ret) return ret.structure;
+                    }
+                }
+              }
+
+            // check containers for needs
+            if (data.container.length > 0) {
+                for (var i=0;i<data.container.length;i++) {
+                    let d = data.container[i];
+                    let container = Game.getObjectById(d.id);
+                    if (container) {
+                        // check contents for excess
+                        for(var resource in container.store) {
+                            if (resource && this.containerNeeds(container,resource) < 0) {
+                                // container has extra resource
+                                console.log(creep,container,"has extra",resource);
+                                if (this.findNeeding(room, resource)) return container;
+                            }
+                        }
+                        // check orders for needs
+                        if (room.memory.resources) {
+                            let containerData = room.memory.resources.container.find( (s) => s.id == d.id );
+                            if (containerData) {
+                                let orders = containerData.orders;
+                                for (var j=0;j<orders.length;j++) {
+                                    let type = orders[j].type;
+                                    let amount = this.containerNeeds(container,type);
+                                    if (amount > 0) {
+                                        // found a needed resource so check lower priority containers
+                                        console.log(creep,container,"needs",amount,type);
+                                        if (room.storage && room.storage.store[type]) return room.storage;
+                                        if (room.terminal && room.terminal.store[type]) return room.terminal;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // check terminal for needs
+            let terminal = creep.room.terminal;
+            if (terminal) {
+                // check for excess
+                for (var resource in terminal.store) {
+                    let amount = -this.terminalNeeds(terminal,resource);
+                    if (resource && amount > 0) {
+                        // excess resource found
+                        console.log(creep,terminal,"has",amount,"extra",resource);
+                        let dest = this.findNeeding(room, resource);
+                        console.log(creep,"found destination",dest.structure)
+                        if (dest) return terminal;
+                    }
+                };
+                // check orders
+                if (room.memory.resources) {
+                    let orders = room.memory.resources.terminal[0].orders;
+                    for (var i=0;i<orders.length;i++) {
+                        let type = orders[i].type;
+                        let amount = this.terminalNeeds(terminal,type);
+                        if (amount > 0) {
+                            // found a needed resource so check lower priority containers
+                            console.log(creep,terminal,"needs",amount,type);
+                            if (room.storage.store[type]) return room.storage;
+                        }
+                    }
+                }
+            }
+            // check storage for needs
+            let storage = creep.room.storage;
+            if (storage) {
+                for (var resource in storage.store) {
+                    let amount = -this.storageNeeds(storage,resource);
+                    if (resource && amount > 0) {
+                        console.log(creep,storage,"has",amount,"extra",resource);
+                        let dest = this.findNeeding(room, resource);
+                        console.log(creep,"found destination",dest.structure)
+                        if (dest) return storage;
+                    }
+                };
+            }
+        }
+        return target;
+    }
+    else {
+        // find destination for carried resource
+        let resourceType = creep.carry[0].resourceType;
+        return Game.getObjectById(this.findNeeding(room, resourceType).structureId);
+    }
 };
-action.work = function(creep){
+action.isValidStructureType = function(target) {
+    let type = target.structureType;
+    return type == STRUCTURE_STORAGE || type == STRUCTURE_TERMINAL || type == STRUCTURE_CONTAINER || type == STRUCTURE_LAB;
+};
+action.cancelAction = function(creep) {
+    delete creep.data.actionName;
+    delete creep.data.targetId;
+    creep.action = null;
+    creep.target = null;
+    delete creep.data.path;
+};
+action.loadResource = function(creep, target, resource, amount) {
+    let room = creep.room;
+    let workResult = creep.withdraw(target, resource, Math.min(amount,creep.carryCapacity-creep.sum));
+    return workResult;
+};
+action.assignDropOff = function(creep, resource) {
+    let data = this.findNeeding(creep.room, resource);
+    if (data) {
+        this.assign(creep, data.structure);
+    }
+    delete creep.data.path;
+};
+action.work = function(creep) {
     let target = creep.target;
+    let type = target.structureType;
     let room = creep.room;
     let storage = room.storage;
     let terminal = room.terminal;
     var workResult = null;
-    if( creep.sum == 0 && target.structureType == STRUCTURE_STORAGE && this.terminalMineralTotal(terminal) < this.terminalMineralSpace(terminal) ){
-        // load: storage => terminal
-        workResult = creep.withdraw(target, room.mineralType);
-        this.assign(creep, terminal);
-        delete creep.data.path;
-    } else if( creep.sum == 0 && target.structureType == STRUCTURE_TERMINAL ) {
-        // load: terminal => storage
-        if( this.isValidEnergyToStorage(creep) )
-            workResult = creep.withdraw(target, RESOURCE_ENERGY);
-        else if( this.isValidMineralToStorage(creep) ){
-            // TODO: get minerals != room mineral
-            let withdraw = r => {
-                if( r != RESOURCE_ENERGY && ( r != room.mineralType || this.terminalMineralTotal(terminal) > this.terminalMineralSpace(terminal) )  && target.store[r] > 0 )
-                    workResult = creep.withdraw(target, r);
-            };
-            _.forEach(Object.keys(target.store), withdraw);
+    var resource = null;
+    var amount = 0;
+
+    if (creep.sum == 0 && type == STRUCTURE_LAB) {
+        // load up from the lab
+        amount = this.labNeeds(target, RESOURCE_ENERGY);
+        if (amount < 0) resource = RESOURCE_ENER/GY;
+        if (!resource) {
+            amount = -this.labNeeds(target, target.mineralType)
+            if (amount > 0) resource = target.mineralType;
         }
-        this.assign(creep, storage);
-        delete creep.data.path;
-    } else if( target.structureType == STRUCTURE_TERMINAL ) {
-        // deliver: storage => terminal
-        workResult = creep.transfer(target, room.mineralType);
-        // unregister action
-        delete creep.data.actionName;
-        delete creep.data.targetId;
-        creep.action = null;
-        creep.target = null;
-        delete creep.data.path;
-    } else if( target.structureType == STRUCTURE_STORAGE ) {
-        // deliver: terminal => storage
-        for(let resourceType in creep.carry) {
-            if( creep.carry[resourceType] > 0 ){
-                workResult = creep.transfer(target, resourceType);
-                if( workResult != OK ) break;
+        if (resource) {
+            workResult = this.loadResource(creep, target, resource, amount);
+            this.assignDropOff(creep, resource);
+        } else this.cancelAction(creep);
+    } else if (creep.sum == 0 && type == STRUCTURE_CONTAINER) {
+        // identify resource and load up from store
+        for (var res in target.store) {
+            amount = -this.containerNeeds(target, res);
+            if (amount > 0) { resource = res; break; }
+        }
+        if (resource) {
+            workResult = this.loadResource(creep, target, resource, amount);
+            this.assignDropOff(creep, resource);
+        } else this.cancelAction(creep);
+    } else if (creep.sum == 0 && type == STRUCTURE_TERMINAL) {
+        // identify resource and load up from store
+        for (var res in target.store) {
+            if (res) {
+                let dat = this.findNeeding(room, res);
+                if (dat.structure.id == target.id) dat = null;
+                if (dat) {
+                    console.log(creep,target,"found need for",dat.amount,res,"in",dat.structure);
+                    amount = dat.amount;
+                }
+                //if (!amount) amount = -this.terminalNeeds(target, res);
+                if (amount > 0) {
+                    resource = res;
+                    break;
+                }
             }
         }
-        //workResult = creep.transfer(target, RESOURCE_ENERGY);
-        // unregister action
-        if( creep.sum == creep.carry.energy ){
-            delete creep.data.actionName;
-            delete creep.data.targetId;
-            creep.action = null;
-            creep.target = null;
-            delete creep.data.path;
+        if (resource) {
+            amount = Math.min(amount,target.store[resource]||0,creep.carryCapacity-creep.sum);
+            console.log(creep,"picking up", amount, resource, "from terminal");
+            workResult = this.loadResource(creep, target, resource, amount);
+            this.assignDropOff(creep, resource);
+        } else this.cancelAction(creep);
+    } else if (creep.sum == 0 && type == STRUCTURE_STORAGE) {
+        // check for other container's needs and local excess
+        for (var res in target.store) {
+            if (res) {
+                let dat = this.findNeeding(room, res);
+                if (dat.structure.id == target.id) dat = null;
+                if (dat) {
+                    console.log(creep,target,"found need for",dat.amount,res,"in",dat.structure);
+                    amount = dat.amount;
+                }
+                //if (!amount) amount = -this.storageNeeds(target, res);
+                if (amount > 0) {
+                    resource = res;
+                    break;
+                }
+            }
+        }
+        if (resource) {
+            amount = Math.min(amount,target.store[resource]||0,creep.carryCapacity-creep.sum);
+            console.log(creep,"picking up", amount, resource, "from storage");
+            workResult = this.loadResource(creep, target, resource, amount);
+            this.assignDropOff(creep, resource);
+        } else this.cancelAction(creep);
+    } else if (type == STRUCTURE_LAB) {
+        // drop off at lab
+        amount = this.labNeeds(target, RESOURCE_ENERGY);
+        if (amount > 0 && creep.carry.energy > 0) {
+            resource = RESOURCE_ENERGY;
+        } else {
+            let order = this.getLabOrder(target);
+            if (order) resource = order.type;
+            amount = this.labNeeds(target, resource);
+            if (!(amount > 0 && creep.carry[resource] > 0)) {
+                resource = null;
+            }
+        }
+        if (resource) workResult = creep.transfer(target, resource, Math.min(amount,creep.carry[resource]));
+
+        if (creep.carry[resource] > amount) {
+            this.assignDropOff(creep, resource);
+        } else {
+            this.cancelAction(creep);
+        }
+    } else if (type == STRUCTURE_CONTAINER) {
+        // drop off at store
+        for (var res in creep.carry) {
+            amount = this.containerNeeds(target, res);
+            if (amount > 0) {
+                resource = res;
+                break;
+            }
+        }
+        if (resource) workResult = creep.transfer(target, resource, Math.min(amount,creep.carry[resource]));
+
+        if (creep.carry[resource] > amount) {
+            this.assignDropOff(creep, resource);
+        } else {
+            this.cancelAction(creep);
+        }
+    } else if (type == STRUCTURE_TERMINAL) {
+        // drop off at store
+        for (var res in creep.carry) {
+            amount = this.terminalNeeds(target, res);
+            if (amount > 0) {
+                resource = res;
+                break;
+            }
+        }
+        if (resource) workResult = creep.transfer(target, resource, Math.min(amount,creep.carry[resource]));
+
+        if (creep.carry[resource] > amount) {
+            this.assignDropOff(creep, resource);
+        } else {
+            this.cancelAction(creep);
+        }
+    } else if (type == STRUCTURE_STORAGE) {
+        // drop off at store
+        for (var res in creep.carry) {
+            amount = this.storageNeeds(target, res);
+            if (amount > 0) {
+                resource = res;
+                break;
+            }
+        }
+        if (resource) workResult = creep.transfer(target, resource, Math.min(amount,creep.carry[resource]));
+
+        if (creep.carry[resource] > amount) {
+            this.assignDropOff(creep, resource);
+        } else {
+            this.cancelAction(creep);
         }
     } else {
-        delete creep.data.actionName;
-        delete creep.data.targetId;
-        creep.action = null;
-        creep.target = null;
-        delete creep.data.path;
+        this.cancelAction(creep);
+    }
+    if (workResult == OK && creep.sum > 0) {
+        // update order
+        let data = room.memory.resources[target.structureType].find((s)=>s.id==target.id);
+        if (data) {
+            let order = data.orders.find(o=>o.type==resource);
+            if (order && order.orderRemaining > 0) {
+                order.orderRemaining -= Math.min(amount,order.orderRemaining);
+            }
+        }
     }
     return workResult;
 };
