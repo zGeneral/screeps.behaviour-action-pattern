@@ -173,6 +173,15 @@ mod.extend = function(){
                     return this._all;
                 }
             },
+            'buildable': {
+                configurable: true,
+                get: function() {
+                    if( _.isUndefined(this._obstacles) ){
+                        this._obstacles = this.room.find(FIND_CONSTRUCTION_SITES, {filter: 'my'});
+                    }
+                    return this._obstacles;
+                }
+            },
             'spawns': {
                 configurable: true,
                 get: function() {
@@ -1378,13 +1387,14 @@ mod.getCostMatrix = function(roomName) {
 
         if( DEBUG ) logSystem(roomName, 'Calulating cost matrix');
         let setCosts = structure => {
-            if(structure.structureType == STRUCTURE_ROAD) {
+            if(structure.structureType == STRUCTURE_ROAD && _.isUndefined(structure.progress)) {
                 costMatrix.set(structure.pos.x, structure.pos.y, 1);
             } else if(structure.structureType !== STRUCTURE_RAMPART || !(structure.isPublic || structure.my) ) {
                 costMatrix.set(structure.pos.x, structure.pos.y, 0xFF);
             }
         };
         room.structures.all.forEach(setCosts);
+        room.structures.buildable.forEach(setCosts);
         const prevTime = Memory.pathfinder[roomName].updated;
         Memory.pathfinder[roomName].costMatrix = costMatrix.serialize();
         Memory.pathfinder[roomName].updated = Game.time;
