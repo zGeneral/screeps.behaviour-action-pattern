@@ -1386,11 +1386,21 @@ mod.getCostMatrix = function(roomName) {
         var costMatrix = new PathFinder.CostMatrix;
 
         if( DEBUG ) logSystem(roomName, 'Calulating cost matrix');
-        let setCosts = structure => {
-            if(structure.structureType == STRUCTURE_ROAD && _.isUndefined(structure.progress)) {
-                costMatrix.set(structure.pos.x, structure.pos.y, 1);
-            } else if(structure.structureType !== STRUCTURE_RAMPART || !(structure.isPublic || structure.my) ) {
-                costMatrix.set(structure.pos.x, structure.pos.y, 0xFF);
+        let setCosts = function(structure) {
+            switch(structure.structureType) {
+                case STRUCTURE_CONTAINER:
+                    return;
+                case STRUCTURE_ROAD:
+                    if (_.isUndefined(structure.progress)) {
+                        costMatrix.set(structure.pos.x, structure.pos.y, 1);
+                    }
+                    return;
+                case STRUCTURE_RAMPART:
+                    if (structure.isPublic || structure.my) {
+                        return;
+                    }
+                default:
+                    costMatrix.set(structure.pos.x, structure.pos.y, 0xFF);
             }
         };
         room.structures.all.forEach(setCosts);
