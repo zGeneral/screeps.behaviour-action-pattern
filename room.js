@@ -1161,11 +1161,11 @@ mod.extend = function(){
                 let structure = data[structureType][i];
                 for(var j=0;j<structure.orders.length;j++) {
                     let order = structure.orders[j];
-                    if (order.orderRemaining < order.orderAmount) {
+                    if (order.orderRemaining <= 0) {
                         let baseAmount = 0;
                         if (structureType == STRUCTURE_STORAGE) baseAmount = order.type == RESOURCE_ENERGY ? MIN_STORAGE_ENERGY[rcl] : MAX_STORAGE_MINERAL;
                         else if (structureType == STRUCTURE_TERMINAL) baseAmount = order.type == RESOURCE_ENERGY ? TERMINAL_ENERGY : 0;
-                        let unloadAmount = baseAmount + order.storeAmount + order.orderAmount;
+                        baseAmount += order.storeAmount;
                         let amount = 0;
                         let cont = Game.getObjectById(structure.id);
                         if (cont && structureType == STRUCTURE_LAB) {
@@ -1177,8 +1177,9 @@ mod.extend = function(){
                             // get stored amount
                             amount = cont.store[order.type] || 0;
                         }
-                        if (unloadAmount > amount) {
-                            order.orderAmount = Math.max(amount-baseAmount-order.storeAmount,order.orderRemaining,0);
+                        if (amount < baseAmount) {
+                            order.orderAmount = 0;
+                            order.orderRemaining = 0;
                         }
                     }
                 }
@@ -1302,7 +1303,7 @@ mod.extend = function(){
 
         this.memory.hostileIds = this.hostileIds;
     };
-    Room.prototype.prepareResourceOrder = function(containerId, resourceType) {
+    Room.prototype.prepareResourceOrder = function(containerId, resourceType, amount) {
         let container = Game.getObjectById(containerId);
         if (!this.my || !container || !container.room.name == this.name ||
                 !(container.structureType == STRUCTURE_LAB ||
@@ -1328,7 +1329,7 @@ mod.extend = function(){
                 orders: []
             });
         }
-        if (container.structureType == STRUCTURE_LAB && amount > 0) {
+        if (container.structureType == STRUCTURE_LAB && resourceType != RESOURCE_ENERGY && amount > 0) {
             // clear other resource types since labs only hold one at a time
             let orders = this.memory.resources[STRUCTURE_LAB].find((s)=>s.id==containerId).orders;
             for (var i=0;i<orders.length;i++) {
