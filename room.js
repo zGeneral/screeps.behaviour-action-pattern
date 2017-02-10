@@ -335,6 +335,29 @@ mod.extend = function(){
                     }
                     return this._labs;
                 }
+            },
+            'virtual': {
+                configurable: true,
+                get: function() {
+                    if( _.isUndefined(this._virtual) ){
+                        this._virtual = _(this.all).concat(this.piles);
+                    }
+                    return this._virtual;
+                }
+            },
+            'piles': {
+                configurable: true,
+                get: function() {
+                    if( _.isUndefined(this._piles) ){
+                        const room = this.room;
+                        this._piles = room.find(FIND_FLAGS, {filter: FLAG_COLOR.command.drop.filter})
+                            .map(function(flag) {
+                                const piles = room.lookForAt(LOOK_ENERGY, flag.pos.x, flag.pos.y);
+                                return piles.length && piles[0] || flag;
+                            });
+                    }
+                    return this._piles;
+                }
             }
         });
     };
@@ -1003,7 +1026,22 @@ mod.extend = function(){
         containers.forEach(add);
 
         if( this.terminal ) {
-            let source = this.terminal.pos.findInRange(this.sources, 2);
+            // terminal in range <= 2 is too simplistic for certain room placements near sources. See #681
+            // This solution finds all walkable source fields in a room, then compares adjacency with the terminal
+            // The first room position adjacent to the terminal is remapped back to it's adjacent source for mapping to terminal
+            let minerSpots = [];
+            let findValidFields = s => { minerSpots = _(minerSpots).concat(Room.validFields(this.name, s.pos.x-1, s.pos.x+1, s.pos.y-1, s.pos.y+1, true)); };
+            _.forEach(this.sources, findValidFields);
+            let sourceField = this.terminal.pos.findClosestByRange(minerSpots, 1);
+            let source = [];
+            if(sourceField){
+                if(this.sources.length == 1){
+                    source = this.sources;
+                } else {
+                    source.push( sourceField.isNearTo(this.sources[0]) ? this.sources[0] : this.sources[1] );
+                }
+            }
+
             let mineral = this.terminal.pos.findInRange(this.minerals, 2);
             let assignTerminal = s => s.memory.terminal = this.terminal.id;
             source.forEach(assignTerminal);
@@ -1262,6 +1300,7 @@ mod.extend = function(){
             this.memory.statistics = {};
 
         let registerHostile = creep => {
+            if(creep.owner.username == "Source Keeper") return;
             // if invader id unregistered
             if( !that.memory.hostileIds.includes(creep.id) ){
                 // handle new invader
@@ -1571,11 +1610,11 @@ mod.adjacentAccessibleRooms = function(roomName, diagonal = true) {
     let addValidRooms = (roomName, direction) => {
         if( diagonal ) {
             let roomExits = Game.map.describeExits(roomName);
-            let dirA = (direction + 2) % 8;
-            let dirB = (direction + 6) % 8;
-            if( roomExits[dirA] && !validRooms.includes(roomExits[dirA]) )
+            let dirA = (direction + 1) % 8 + 1;
+            let dirB = (direction + 5) % 8 + 1;
+            if( roomExits && roomExits[dirA] && !validRooms.includes(roomExits[dirA]) )
                 validRooms.push(roomExits[dirA]);
-            if( roomExits[dirB] && !validRooms.includes(roomExits[dirB]) )
+            if( roomExits && roomExits[dirB] && !validRooms.includes(roomExits[dirB]) )
                 validRooms.push(roomExits[dirB]);
         }
         validRooms.push(roomName);

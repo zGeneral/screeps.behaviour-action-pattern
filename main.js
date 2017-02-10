@@ -132,6 +132,7 @@ global.install = () => {
         Tower: load("tower"),
         Events: load('events'),
         Grafana: GRAFANA ? load('grafana') : undefined,
+        Visuals: ROOM_VISUALS ? load('visuals') : undefined,
     });
     _.assign(global.Task, {
         guard: load("task.guard"),
@@ -153,6 +154,7 @@ global.install = () => {
             claiming: load("creep.action.claiming"),
             defending: load("creep.action.defending"),
             dismantling: load("creep.action.dismantling"),
+            dropping: load("creep.action.dropping"),
             feeding: load("creep.action.feeding"), 
             fortifying: load("creep.action.fortifying"), 
             fueling: load("creep.action.fueling"), 
@@ -277,6 +279,8 @@ module.exports.loop = function () {
     Population.cleanup();
     // custom cleanup
     if( global.mainInjection.cleanup ) global.mainInjection.cleanup();
+	
+    if ( ROOM_VISUALS ) Visuals.run(); // At end to correctly display used CPU.
     
     if ( GRAFANA && Game.time % GRAFANA_INTERVAL === 0 ) Grafana.run();
 
