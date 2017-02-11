@@ -18,13 +18,11 @@ action.step = function(creep){
             } else if( !creep.data.travelRoom ) {
                 logError('no travel room', {creepName:creep.name, roomName:creep.room.name, Behaviour:creep.data.creepType, Action:'travelling'});
             } else if( creep.room.getBorder(creep.data.travelRoom) ) {
-                if (Game.rooms[creep.data.travelRoom]) {
-                    logError('bad border target', {creepName:creep.name, roomName:creep.room.name, Behaviour:creep.data.creepType, Action:'travelling'});
-                }
-                targetRange = 24;
+                logError('bad border target', {creepName:creep.name, roomName:creep.room.name, Behaviour:creep.data.creepType, Action:'travelling'});
+                targetRange = TRAVELLING_BORDER_RANGE;
                 pos = new RoomPosition(25, 25, creep.data.travelRoom);
             } else {
-                targetRange = 24;
+                targetRange = TRAVELLING_BORDER_RANGE;
                 pos = new RoomPosition(25, 25, creep.data.travelRoom);
             }
             if( creep.pos.roomName === pos.roomName ) {
