@@ -54,11 +54,22 @@ mod.strategies = {
         name: `default-${mod.name}`,
     },
     travelling: {
+        name: `travelling-${mod.name}`,
         newTarget: function(creep) {
-            if (creep.data.travelRoom) {
-                const room = Game.rooms[creep.data.travelRoom];
-                return room && (room.storage || room.spawns[0]);
+            if (!creep.data.travelRoom) {
+                if (creep.data.travelPos) {
+                    creep.data.travelRoom = creep.data.travelPos.roomName;
+                } else {
+                    creep.data.travelRoom = creep.data.homeRoom;
+                }
             }
+            const room = Game.rooms[creep.data.travelRoom];
+            let target = room && (room.storage || room.structures.spawns[0]);
+            if (!target) {
+                // TODO create flag and place in room
+                return creep;
+            }
+            return target;
         },
     },
 };

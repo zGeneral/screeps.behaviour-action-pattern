@@ -48,6 +48,7 @@ action.onAssignment = function(creep, target) {
 };
 action.defaultStrategy.newTarget = function(creep) {
     if( creep.data.travelPos || creep.data.travelRoom ) {
+        // TODO create flag and place in room
         return creep;
     }
     return null;
