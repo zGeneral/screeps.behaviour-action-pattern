@@ -3,7 +3,10 @@ module.exports = action;
 action.isValidTarget = function(target){ return target != null; };
 action.isAddableAction = function(){ return true; };
 action.isAddableTarget = function(){ return true; };
-action.newTarget = function(creep){ return null; }
+action.newTarget = function(creep){
+    // TODO trace it: console.log(creep.strategy([action.name]).key);
+    return creep.getStrategyHandler([action.name], 'newTarget', creep);
+};
 action.step = function(creep){
     if(CHATTY) creep.say(this.name, SAY_PUBLIC);
     if( creep.target ){
@@ -15,7 +18,9 @@ action.step = function(creep){
             } else if( !creep.data.travelRoom ) {
                 logError('no travel room', {creepName:creep.name, roomName:creep.room.name, Behaviour:creep.data.creepType, Action:'travelling'});
             } else if( creep.room.getBorder(creep.data.travelRoom) ) {
-                logError('bad border target', {creepName:creep.name, roomName:creep.room.name, Behaviour:creep.data.creepType, Action:'travelling'});
+                if (Game.rooms[creep.data.travelRoom]) {
+                    logError('bad border target', {creepName:creep.name, roomName:creep.room.name, Behaviour:creep.data.creepType, Action:'travelling'});
+                }
                 targetRange = 24;
                 pos = new RoomPosition(25, 25, creep.data.travelRoom);
             } else {
@@ -31,7 +36,7 @@ action.step = function(creep){
         else pos = creep.target.pos;
         creep.drive( pos, this.reachedRange, targetRange, Infinity );
     }
-    if( !creep.target || creep.target.pos.roomName == creep.pos.roomName ){
+    if( !creep.target || creep.target !== creep && creep.target.pos.roomName == creep.pos.roomName ){
         // unregister
         delete creep.action;
         delete creep.target;
@@ -42,4 +47,10 @@ action.step = function(creep){
 }
 action.onAssignment = function(creep, target) {
     if( SAY_ASSIGNMENT ) creep.say(String.fromCharCode(9784), SAY_PUBLIC);
+};
+action.defaultStrategy.newTarget = function(creep) {
+    if( creep.data.travelPos || creep.data.travelRoom ) {
+        return creep;
+    }
+    return null;
 };

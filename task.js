@@ -12,6 +12,7 @@ mod.register = function () {
         Task.attackController,
         Task.robbing,
         Task.reputation,
+        Task.delivery,
     ];
     var loop = task => {
         task.register();
