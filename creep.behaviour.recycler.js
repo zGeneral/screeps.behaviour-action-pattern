@@ -59,7 +59,10 @@ mod.strategies = {
             if (!creep.data.travelRoom) {
                 if (creep.data.travelPos) {
                     creep.data.travelRoom = creep.data.travelPos.roomName;
+                } else if (creep.room.structures.spawns.length) {
+                    return null; // arrived
                 } else {
+                    // TODO search for closest spawn
                     creep.data.travelRoom = creep.data.homeRoom;
                 }
             }
