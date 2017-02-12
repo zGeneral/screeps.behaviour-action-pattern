@@ -1127,7 +1127,8 @@ mod.extend = function(){
 
         // for each entry add to memory ( if not contained )
         let add = (lab) => {
-            if( !this.memory.labs.find( (l) => l.id == lab.id ) ) {
+            let labData = this.memory.labs.find( (l) => l.id == lab.id );
+            if( !labData ) {
                 this.memory.labs.push({
                     id: lab.id,
                     storage: storageLabs.includes(lab.id),
@@ -1194,6 +1195,7 @@ mod.extend = function(){
         let data = this.memory.resources;
         if (!this.my || !data) return;
 
+        // go through reallacation orders and reset completed orders
         for(var structureType in data) {
             for(var i=0;i<data[structureType].length;i++) {
                 let structure = data[structureType][i];
@@ -1223,7 +1225,7 @@ mod.extend = function(){
                 }
             }
         }
-    }
+    };
     Room.prototype.terminalBroker = function () {
         if( !this.my || !this.terminal ) return;
         let that = this;
@@ -1342,6 +1344,34 @@ mod.extend = function(){
 
         this.memory.hostileIds = this.hostileIds;
     };
+    Room.prototype.processLabs = function() {
+        // run lab reactions WOO!
+        let labs = this.find(FIND_MY_STRUCTURES, { filter: (s) => { return s.structureType == STRUCTURE_LAB; } } );
+        let master_labs = labs.filter( (l) => {
+            let data = this.memory.resources.lab.find( (s) => s.id == l.id );
+            return data ? data.reactionState == LAB_MASTER : false;
+        } );
+        for (var i=0;i<master_labs.length;i++) {
+            // see if the reaction is possible
+            let master = master_labs[i];
+            if (master.cooldown > 0) continue;
+            let data = this.memory.resources.lab.find( (s) => s.id == master.id );
+            if (!data) continue;
+            let compound = data.reactionType;
+            if (master.mineralAmount > 0 && master.mineralType != compound) continue;
+            let slave_a = Game.getObjectById(data.slave_a);
+            let slave_b = Game.getObjectById(data.slave_b);
+            if (!slave_a || slave_a.mineralType != LAB_REACTIONS[compound][0] || !slave_b || slave_b.mineralType != LAB_REACTIONS[compound][1]) continue;
+
+            if (master.runReaction(slave_a, slave_b) == OK) {
+                data.reactionAmount -= 5;
+                console.log(master,"FU - SION - HA!",data.reactionAmount,compound,"remaining on order");
+                if (data.reactionAmount <= 0) {
+                    this.cancelReactionOrder(master.id);
+                }
+            }
+        }
+    };
     Room.prototype.prepareResourceOrder = function(containerId, resourceType, amount) {
         let container = Game.getObjectById(containerId);
         if (!this.my || !container || !container.room.name == this.name ||
@@ -1363,7 +1393,11 @@ mod.extend = function(){
             };
         }
         if (!this.memory.resources[container.structureType].find( (s) => s.id == containerId )) {
-            this.memory.resources[container.structureType].push({
+            this.memory.resources[container.structureType].push(container.structureType==STRUCTURE_LAB ? {
+                id: containerId,
+                orders: [],
+                reactionState: LAB_IDLE
+            } : {
                 id: containerId,
                 orders: []
             });
@@ -1428,6 +1462,128 @@ mod.extend = function(){
         }
         return OK;
     };
+    Room.prototype.cancelReactionOrder = function(labId) {
+        let labData = this.memory.resources.lab.find( (l) => l.id == labId );
+        if ( labData ) {
+            // clear slave reaction orders
+            if (labData.slave_a) this.cancelReactionOrder(labData.slave_a);
+            if (labData.slave_b) this.cancelReactionOrder(labData.slave_b);
+
+            // clear reaction orders
+            labData.reactionState = LAB_IDLE;
+            delete labData.reactionType;
+            delete labData.reactionAmount;
+            delete labData.master;
+            delete labData.slave_a;
+            delete labData.slave_b
+
+            // clear local resource orders
+            for (var i=0;i<labData.orders.length;i++) {
+                let order = labData.orders[i];
+                if (order.type == RESOURCE_ENERGY) continue;
+                order.orderAmount = 0;
+                order.orderRemaining = 0;
+                order.storeAmount = 0;
+            }
+        }
+    };
+    Room.prototype.prepareReactionOrder = function(labId, resourceType, amount) {
+        let lab = Game.getObjectById(labId);
+        if (!this.my || !lab || !lab.structureType == STRUCTURE_LAB) return ERR_INVALID_TARGET;
+        if (!LAB_REACTIONS.hasOwnProperty(resourceType)) {
+            return ERR_INVALID_ARGS;
+        }
+        if (this.memory.resources === undefined) {
+            this.memory.resources = {
+                lab: [],
+                container: [],
+                terminal: [],
+                storage: []
+            };
+        }
+        if (amount > 0) {
+            let labData = this.memory.resources.lab.find( (l) => l.id == labId );
+            if ( !labData ) {
+                this.memory.resources.lab.push({
+                    id: labId,
+                    orders: [],
+                    reactionState: LAB_IDLE
+                });
+                labData = this.memory.resources.lab.find( (l) => l.id == labId );
+            }
+
+            this.cancelReactionOrder(labId);
+        }
+        return OK;
+    };
+    Room.prototype.placeReactionOrder = function(labId, resourceType, amount) {
+        if (amount <= 0) return OK;
+        let lab_master = Game.getObjectById(labId);
+        let component_a = LAB_REACTIONS[resourceType][0];
+        let component_b = LAB_REACTIONS[resourceType][1];
+        var lab_slave_a = null;
+        var lab_slave_b = null;
+
+        // find slave labs
+        let nearbyLabs = lab_master.pos.findInRange(FIND_MY_STRUCTURES, 2, {filter: (s)=>{ return s.structureType==STRUCTURE_LAB && s.id != lab_master.id; }});
+        //console.log(lab_master,"found",nearbyLabs.length,"potential slave labs");
+        for (var i=0;i<nearbyLabs.length;i++) {
+            let lab = nearbyLabs[i];
+            let data = this.memory.resources.lab.find( (l) => l.id == lab.id );
+            //console.log(lab_master,"potential slave",i,"has",lab.mineralType,"and is currently",data?data.reactionState:"idle");
+            if (lab_slave_a == null && lab.mineralType == component_a) {
+                lab_slave_a = lab;
+            } else if (lab_slave_b == null && lab.mineralType == component_b) {
+                lab_slave_b = lab;
+            } else if (!data || !data.reactionState || data.reactionState == LAB_IDLE) {
+                if (lab_slave_a == null) lab_slave_a = lab;
+                else if (lab_slave_b == null) lab_slave_b = lab;
+            }
+            if (lab_slave_a && lab_slave_b) break;
+        }
+
+        // qualify labs and prepare states
+        if (lab_slave_a == null || lab_slave_b == null) return ERR_NOT_FOUND;
+        let ret = this.prepareReactionOrder(labId, resourceType, amount);
+        if (ret != OK) {
+            return ret;
+        }
+        ret = this.prepareReactionOrder(lab_slave_a.id, resourceType, amount);
+        if (ret != OK) {
+            return ret;
+        }
+        ret = this.prepareReactionOrder(lab_slave_b.id, resourceType, amount);
+        if (ret != OK) {
+            return ret;
+        }
+
+        // place reaction order with master lab
+        let labData = this.memory.resources.lab.find( (l) => l.id == labId );
+        if ( labData ) {
+            labData.reactionState = LAB_MASTER;
+            labData.reactionType = resourceType;
+            labData.reactionAmount = amount;
+            labData.slave_a = lab_slave_a.id;
+            labData.slave_b = lab_slave_b.id;
+        }
+
+        // place orders with slave labs
+        labData = this.memory.resources.lab.find( (l) => l.id == lab_slave_a.id );
+        if ( labData ) {
+            labData.reactionState = LAB_SLAVE_1;
+            labData.master = lab_master.id;
+            this.placeOrder(lab_slave_a.id, component_a, amount);
+        }
+        labData = this.memory.resources.lab.find( (l) => l.id == lab_slave_b.id );
+        if ( labData ) {
+            labData.reactionState = LAB_SLAVE_1;
+            labData.master = lab_master.id;
+            this.placeOrder(lab_slave_b.id, component_b, amount);
+        }
+
+        //console.log(lab_master,"found slave labs",lab_slave_a,"for",component_a,"and",lab_slave_b,"for",component_b);
+        return OK;
+    };
 };
 mod.flush = function(){
     let clean = room => {
@@ -1483,6 +1639,7 @@ mod.analyze = function(){
             room.roadConstruction();
             room.linkDispatcher();
             room.processInvaders();
+            room.processLabs();
         }
         catch(err) {
             Game.notify('Error in room.js (Room.prototype.loop) for "' + room.name + '" : ' + err.stack ? err + '<br/>' + err.stack : err);

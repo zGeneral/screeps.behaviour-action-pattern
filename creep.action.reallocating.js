@@ -11,9 +11,9 @@ action.terminalNeeds = function(terminal, resourceType){
     let order = null;
     if (terminalData) order = terminalData.orders.find((o)=>{return o.type==resourceType;});
     if (!order) order = { orderAmount: 0, orderRemaining: 0, storeAmount: 0 };
-    let loadTarget = order.orderRemaining + order.storeAmount + (resourceType == RESOURCE_ENERGY) ? TERMINAL_ENERGY : 0;
-    let unloadTarget = order.orderAmount + order.storeAmount + (resourceType == RESOURCE_ENERGY) ? TERMINAL_ENERGY : 0;
-    let store = terminal.store[resourceType];
+    let loadTarget = order.orderRemaining + order.storeAmount + ((resourceType == RESOURCE_ENERGY) ? TERMINAL_ENERGY : 0);
+    let unloadTarget = order.orderAmount + order.storeAmount + ((resourceType == RESOURCE_ENERGY) ? TERMINAL_ENERGY : 0);
+    let store = terminal.store[resourceType]||0;
     if (store < loadTarget) ret = Math.min(loadTarget-store,terminal.storeCapacity-terminal.sum);
     else if (store > unloadTarget*1.05) ret = unloadTarget-store;
     return ret;
@@ -28,10 +28,10 @@ action.storageNeeds = function(storage, resourceType){
     if (storageData) order = storageData.orders.find((o)=>{return o.type==resourceType;});
     if (!order) order = { orderAmount: 0, orderRemaining: 0, storeAmount: 0 };
     let rcl = storage.room.controller.level;
-    let loadTarget = order.orderRemaining + order.storeAmount + (resourceType == RESOURCE_ENERGY) ? MIN_STORAGE_ENERGY[rcl] : MAX_STORAGE_MINERAL;
+    let loadTarget = order.orderRemaining + order.storeAmount + ((resourceType == RESOURCE_ENERGY) ? MIN_STORAGE_ENERGY[rcl] : MAX_STORAGE_MINERAL);
     // storage always wants energy
     let unloadTarget = (resourceType == RESOURCE_ENERGY) ? (storage.storeCapacity-storage.sum)+storage.store.energy : order.orderAmount + order.storeAmount + MAX_STORAGE_MINERAL;
-    let store = storage.store[resourceType];
+    let store = storage.store[resourceType]||0;
     if (store < loadTarget) ret = Math.min(loadTarget-store,storage.storeCapacity-storage.sum);
     else if (store > unloadTarget*1.05) ret = unloadTarget-store;
     return ret;
@@ -55,28 +55,30 @@ action.containerNeeds = function(container, resourceType){
 };
 action.labNeeds = function(lab, resourceType){
     if (!lab || !lab.room.memory.resources) return 0;
+    let loadTarget = 0;
+    let unloadTarget = 0;
 
     // look up resource and calculate needs
     let containerData = lab.room.memory.resources.lab.find( (s) => s.id == lab.id );
     if (containerData) {
         let order = containerData.orders.find((o)=>{return o.type==resourceType;});
         if (order) {
-            let loadTarget = order.orderRemaining + order.storeAmount;
-            let unloadTarget = order.orderAmount + order.storeAmount;
-            let store = 0;
-            let space = 0;
-            if (resourceType == RESOURCE_ENERGY) {
-                store = lab.energy;
-                space = lab.energyCapacity-lab.energy;
-            } else {
-                store = lab.mineralType == resourceType ? lab.mineralAmount : 0;
-                space = lab.mineralCapacity-lab.mineralAmount;
-            }
-            // lab requires precise loading
-            if (store < loadTarget) return Math.min(loadTarget-store,space);
-            if (store > unloadTarget) return unloadTarget-store;
+            loadTarget = order.orderRemaining + order.storeAmount;
+            unloadTarget = order.orderAmount + order.storeAmount;
         }
     }
+    let store = 0;
+    let space = 0;
+    if (resourceType == RESOURCE_ENERGY) {
+        store = lab.energy;
+        space = lab.energyCapacity-lab.energy;
+    } else {
+        store = lab.mineralType == resourceType ? lab.mineralAmount : 0;
+        space = lab.mineralCapacity-lab.mineralAmount;
+    }
+    // lab requires precise loading
+    if (store < loadTarget) return Math.min(loadTarget-store,space);
+    if (store > unloadTarget) return unloadTarget-store;
     return 0;
 };
 action.getLabOrder = function(lab) {
@@ -99,7 +101,7 @@ action.getLabOrder = function(lab) {
 
     return order;
 };
-action.findNeeding = function(room, resourceType, amountMin){
+action.findNeeding = function(room, resourceType, amountMin, structureId){
     if (!amountMin) amountMin = 1;
 //    if (!RESOURCES_ALL.find((r)=>{r==resourceType;})) return ERR_INVALID_ARGS;
 
@@ -110,7 +112,7 @@ action.findNeeding = function(room, resourceType, amountMin){
                 let d = data.labs[i];
                 let lab = Game.getObjectById(d.id);
                 let amount = this.labNeeds(lab,resourceType);
-                if (amount >= amountMin && (lab.mineralAmount == 0 || lab.mineralType == resourceType))
+                if (amount >= amountMin && (lab.mineralAmount == 0 || lab.mineralType == resourceType) && d.id != structureId)
                     return { structure: lab, amount: amount};
             }
         }
@@ -119,19 +121,19 @@ action.findNeeding = function(room, resourceType, amountMin){
                 let d = data.container[i];
                 let container = Game.getObjectById(d.id);
                 let amount = this.containerNeeds(container,resourceType);
-                if (amount >= amountMin) return { structure: container, amount: amount };
+                if (amount >= amountMin && d.id != structureId) return { structure: container, amount: amount };
             }
         }
     }
     let terminal = room.terminal;
     if (terminal) {
         let amount = this.terminalNeeds(terminal,resourceType);
-        if (amount >= amountMin) return { structure: terminal, amount: amount };
+        if (amount >= amountMin && terminal.id != structureId) return { structure: terminal, amount: amount };
     }
     let storage = room.storage;
     if (storage) {
         let amount = this.storageNeeds(storage,resourceType);
-        if (amount >= amountMin) return { structure: storage, amount: amount };
+        if (amount >= amountMin && storage.id != structureId) return { structure: storage, amount: amount };
     }
 
     // no specific needs found ... check for overflow availability
@@ -177,6 +179,7 @@ action.isAddableTarget = function(target){
 };
 action.newTarget = function(creep){
     let room = creep.room;
+    if (DEBUG_LOGISTICS) console.log(creep,"is looking for reallocation targets in", room.name);
     var target = null;
     if( creep.sum == 0) {
         let data = room.memory;
@@ -279,7 +282,7 @@ action.newTarget = function(creep){
                         if (amount > 0) {
                             // excess resource found
                             if (DEBUG_LOGISTICS) console.log(creep,terminal,"has",amount,"extra",resource);
-                            let dest = this.findNeeding(room, resource);
+                            let dest = this.findNeeding(room, resource, 1, terminal.id);
                             if (dest && dest.structure.id != terminal.id) {
                                 if (DEBUG_LOGISTICS) console.log(creep,"found destination",dest.structure)
                                 return terminal;
@@ -290,29 +293,38 @@ action.newTarget = function(creep){
                 // check orders
                 if (room.memory.resources) {
                     let orders = room.memory.resources.terminal[0].orders;
+                    let type = null;
+                    let amount = 0;
                     for (var i=0;i<orders.length;i++) {
-                        let type = orders[i].type;
-                        let amount = this.terminalNeeds(terminal,type);
-                        if (amount > 0) {
-                            // found a needed resource so check lower priority containers
-                            if (DEBUG_LOGISTICS) console.log(creep,terminal,"needs",amount,type);
-                            if (room.storage.store[type]) return room.storage;
-                        }
+                        type = orders[i].type;
+                        amount = this.terminalNeeds(terminal,type);
+                        if (amount > 0) break;
+                    }
+                    if (amount == 0) {
+                        type = RESOURCE_ENERGY;
+                        amount = this.terminalNeeds(terminal,type);
+                    }
+                    if (amount > 0) {
+                        // found a needed resource so check lower priority containers
+                        if (DEBUG_LOGISTICS) console.log(creep,terminal,"needs",amount,type);
+                        if (room.storage.store[type]) return room.storage;
                     }
                 }
             }
             // check storage for needs
             let storage = creep.room.storage;
             if (storage) {
+                // check for excess to overflow back to terminal
                 for (var resource in storage.store) {
                     let amount = -this.storageNeeds(storage,resource);
                     if (resource && amount > 0) {
                         if (DEBUG_LOGISTICS) console.log(creep,storage,"has",amount,"extra",resource);
-                        let dest = this.findNeeding(room, resource);
+                        let dest = this.findNeeding(room, resource, 1, storage.id);
                         if (DEBUG_LOGISTICS) console.log(creep,"found destination",dest.structure)
                         if (dest) return storage;
                     }
                 };
+                // storage is lowest priority so has nowhere local to request resources from
             }
         }
         return target;
@@ -358,8 +370,8 @@ action.work = function(creep) {
 
     if (creep.sum == 0 && type == STRUCTURE_LAB) {
         // load up from the lab
-        amount = this.labNeeds(target, RESOURCE_ENERGY);
-        if (amount < 0) resource = RESOURCE_ENER/GY;
+        amount = -this.labNeeds(target, RESOURCE_ENERGY);
+        if (amount > 0) resource = RESOURCE_ENERGY;
         if (!resource) {
             amount = -this.labNeeds(target, target.mineralType)
             if (amount > 0) resource = target.mineralType;
