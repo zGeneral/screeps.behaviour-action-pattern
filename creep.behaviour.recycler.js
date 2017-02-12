@@ -27,6 +27,7 @@ mod.nextAction = function(creep){
         Creep.action.travelling,
         Creep.action.storing,
         Creep.action.feeding,
+        Creep.action.dropping,
         ];
 
     if( !creep.data.travelRoom ) {
