@@ -5,12 +5,17 @@ mod.run = function(creep) {
     // Assign next Action
     let oldTargetId = creep.data.targetId;
     if( creep.action == null || creep.action.name == 'idle' ) {
+        let p = startProfiling('remoteHauler.nextAction');
         this.nextAction(creep);
+        p.checkCPU(creep.name, 0.5);
     }
     
     // Do some work
     if( creep.action && creep.target ) {
+        let p = startProfiling('remoteHauler.step');
+        let name = creep.action.name;
         creep.action.step(creep);
+        p.checkCPU(creep.name +' '+ name, 0.5);
     } else {
         logError('Creep without action/activity!\nCreep: ' + creep.name + '\ndata: ' + JSON.stringify(creep.data));
     }

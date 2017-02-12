@@ -419,9 +419,9 @@ mod.extend = function(){
 };
 mod.execute = function(){
     let run = creep => {
-        let p = startProfiling(creep.name);
+        let p = startProfiling('execute:' + (creep.action ? creep.action.name : ''));
         creep.run();
-        p.checkCPU('execute', 5);
+        p.checkCPU(creep.name + (creep.action ? creep.action.name : ''), 1.5);
     };
     _.forEach(Game.creeps, run);
 };

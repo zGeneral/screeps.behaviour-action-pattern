@@ -216,7 +216,7 @@ global.install = () => {
     if( global.mainInjection.extend ) global.mainInjection.extend();
 };
 global.install();
-
+Memory.profiling = {ticks: 0, totalCPU: 0, avgCPU: {}};
 let cpuAtFirstLoop;
 module.exports.loop = function () {
     const cpuAtLoop = Game.cpu.getUsed();
@@ -238,21 +238,27 @@ module.exports.loop = function () {
     _.assign(global, load("parameter"));
     global.isNewServer = Game.cacheTime !== Game.time-1 || Game.time - Game.lastServerSwitch > 50; // enforce reload after 50 ticks
     if( global.isNewServer ) Game.lastServerSwitch = Game.time;
+    p.checkCPU('startup', 3);
     // Flush cache
     Events.flush();
+    p.checkCPU('Events.flush', 3);
     FlagDir.flush();
+    p.checkCPU('FlagDir.flush', 3);
     Population.flush();
+    p.checkCPU('Population.flush', 3);
     Room.flush();
+    p.checkCPU('Room.flush', 3);
     // custom flush
     if( global.mainInjection.flush ) global.mainInjection.flush();
-    p.checkCPU('flush', 5);
     // analyze environment
     FlagDir.analyze();
+    p.checkCPU('FlagDir.analyze', 3);
     Room.analyze();
+    p.checkCPU('Room.analyze', 3);
     Population.analyze();
+    p.checkCPU('Population.analyze', 3);
     // custom analyze
     if( global.mainInjection.analyze ) global.mainInjection.analyze();
-    p.checkCPU('analyze', 5);
     // Register event hooks
     Creep.register();
     Spawn.register();

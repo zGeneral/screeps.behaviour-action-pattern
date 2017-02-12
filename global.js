@@ -367,7 +367,13 @@ mod.startProfiling = function(label) {
             },
             reset: () => then = Game.cpu.getUsed(),
             total: () => {
-                global.logSystem(label + ' total ', _.round(_total, 2) + ' CPU');
+                if (_.isUndefined(Memory.profiling)) Memory.profiling = {ticks: 0, totalCPU: 0, avgCPU: {}};
+                const ticks = ++Memory.profiling.ticks;
+                const totalCPU = (Memory.profiling.totalCPU += _total);
+                const avg = Memory.profiling.totalCPU / Memory.profiling.ticks;
+                if (ticks % 100 === 0) Memory.profiling.avgCPU[ticks] = avg;
+                Memory.profiling.avgCPU.current = avg;
+                global.logSystem(label + ' total ', _.round(_total, 2) + ' CPU' + ' ' + avg + ' AVG(' + ticks + ' ticks)');
                 console.log('\n');
             }
         };

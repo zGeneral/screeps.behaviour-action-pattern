@@ -163,6 +163,7 @@ mod.flush = function() {
 };
 mod.analyze = function(){
     let register = entry => {
+        let p = startProfiling('Population.analyze.register');
         let creep = Game.creeps[entry.creepName];
         if ( !creep ) {
             if(CENSUS_ANNOUNCEMENTS) global.logSystem(entry.homeRoom, dye(CRAYON.death, 'Good night ' + entry.creepName + '!') );
@@ -217,6 +218,7 @@ mod.analyze = function(){
 
             creep.data = entry;
         }
+        p.checkCPU(entry.creepName, 3);
     };
     _.forEach(Memory.population, register);
 
