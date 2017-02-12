@@ -184,8 +184,8 @@ action.newTarget = function(creep){
                             if (room.storage.store[lab.mineralType]) return room.storage;
                             if (room.terminal.store[lab.mineralType]) return room.terminal;
                             let ret = room.findContainerWith(lab.mineralType);
-                            if (DEBUG_LOGISTICS) console.log(creep,lab,"found some in",ret.structure)
                             if (ret) return ret.structure;
+                            room.placeRoomOrder(lab.id,lab.mineralType,amount);
                         }
                     } else {
                         // lab is empty so check and fill order
@@ -199,6 +199,7 @@ action.newTarget = function(creep){
                             if (room.terminal.store[resourceType]) return room.terminal;
                             let ret = room.findContainerWith(resourceType);
                             if (ret) return ret.structure;
+                            room.placeRoomOrder(lab.id,resourceType,order.orderRemaining);
                         }
                     }
                     amount = this.labNeeds(lab,RESOURCE_ENERGY);

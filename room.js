@@ -1482,6 +1482,36 @@ mod.extend = function(){
         }
         return OK;
     };
+    Room.prototype.placeRoomOrder = function(orderId, resourceType, amount) {
+        if (amount <= 0) return OK;
+        if (this.memory.resources === undefined) {
+            this.memory.resources = {
+                lab: [],
+                container: [],
+                terminal: [],
+                storage: []
+            };
+        }
+        if (this.memory.resources.orders === undefined) {
+            this.memory.resources.orders = [];
+        }
+        let orders = this.memory.resources.orders;
+        let existingOrder = orders.find((o)=>{ return o.id==orderId && o.type==resourceType; });
+        if (existingOrder) {
+            // update existing order
+            existingOrder.amount = amount;
+        } else {
+            // create new order
+            orders.push({
+                id: orderId,
+                type: resourceType,
+                amount: amount,
+                offers: []
+            });
+        }
+
+        return OK;
+    };
     Room.prototype.cancelReactionOrder = function(labId) {
         let labData = this.memory.resources.lab.find( (l) => l.id == labId );
         if ( labData ) {
@@ -1495,8 +1525,21 @@ mod.extend = function(){
             delete labData.reactionAmount;
             delete labData.master;
             delete labData.slave_a;
-            delete labData.slave_b
+            delete labData.slave_b;
 
+            if (this.memory.resources === undefined) {
+                this.memory.resources = {
+                    lab: [],
+                    container: [],
+                    terminal: [],
+                    storage: []
+                };
+            }
+            if (this.memory.resources.orders === undefined) {
+                this.memory.resources.orders = [];
+            }
+
+            let orders = this.memory.resources.orders;
             // clear local resource orders
             for (var i=0;i<labData.orders.length;i++) {
                 let order = labData.orders[i];
@@ -1506,8 +1549,11 @@ mod.extend = function(){
                 order.storeAmount = 0;
             }
         }
+
+        return OK;
     };
     Room.prototype.prepareReactionOrder = function(labId, resourceType, amount) {
+        if (amount <= 0) return OK;
         let lab = Game.getObjectById(labId);
         if (!this.my || !lab || !lab.structureType == STRUCTURE_LAB) return ERR_INVALID_TARGET;
         if (!LAB_REACTIONS.hasOwnProperty(resourceType)) {
@@ -1521,19 +1567,19 @@ mod.extend = function(){
                 storage: []
             };
         }
-        if (amount > 0) {
-            let labData = this.memory.resources.lab.find( (l) => l.id == labId );
-            if ( !labData ) {
-                this.memory.resources.lab.push({
-                    id: labId,
-                    orders: [],
-                    reactionState: LAB_IDLE
-                });
-                labData = this.memory.resources.lab.find( (l) => l.id == labId );
-            }
 
-            this.cancelReactionOrder(labId);
+        let labData = this.memory.resources.lab.find( (l) => l.id == labId );
+        if ( !labData ) {
+            this.memory.resources.lab.push({
+                id: labId,
+                orders: [],
+                reactionState: LAB_IDLE
+            });
+            labData = this.memory.resources.lab.find( (l) => l.id == labId );
         }
+
+        this.cancelReactionOrder(labId);
+
         return OK;
     };
     Room.prototype.placeReactionOrder = function(labId, resourceType, amount) {
