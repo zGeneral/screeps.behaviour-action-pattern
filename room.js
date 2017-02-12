@@ -1228,6 +1228,40 @@ mod.extend = function(){
             }
         }
     };
+    Room.prototype.updateRoomOrders = function () {
+        if (!this.memory.resources || !this.memory.resources.orders) return;
+        let orders = this.memory.resources.orders;
+        for (var i=0;i<orders.length;i++) {
+            let order = orders[i];
+            let amountRemaining = order.amount;
+            for (var j=0;j<order.offers.length;j++) {
+                let offer = order.offers[j];
+                amountRemaining -= offer.amount;
+                if (amountRemaining <= 0 && i < order.offers.length-1) order.offers = order.offers.slice(0,i);
+            }
+            if (amountRemaining > 0) {
+                let rooms = _.filter(Game.rooms, (room) => { return room.my && room.storage && room.terminal; });
+                rooms.sort((a,b)=>{ return Game.map.getRoomLinearDistance(this.name,a.name,true) - Game.map.getRoomLinearDistance(this.name,b.name,true); });
+                for (var j=0;j<rooms.length;j++) {
+                    let room = rooms[j];
+                    let available = (room.storage[order.type]||0) + (room.terminal[order.type]||0);
+                    if (available < 100) continue;
+                    let existingOffer = order.offers.find((o)=>o.room==this.name);
+                    if (existingOffer) {
+                        amountRemaining -= (available - existingOffer.amount);
+                        existingOffer.amount = available;
+                    } else {
+                        amountRemaining -= available;
+                        order.offers.push({
+                            room: this.name,
+                            amount: available
+                        });
+                    }
+                    if (amountRemaining <= 0) break;
+                }
+            }
+        }
+    };
     Room.prototype.terminalBroker = function () {
         if( !this.my || !this.terminal ) return;
         let that = this;
@@ -1744,6 +1778,7 @@ mod.analyze = function(){
                 room.saveLinks();
                 room.saveLabs();
                 room.updateResourceOrders();
+                room.updateRoomOrders();
                 room.terminalBroker();
             }
             room.roadConstruction();

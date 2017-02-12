@@ -50,6 +50,7 @@ let mod = {
         8: 50000
     },
     MAX_STORAGE_MINERAL:200000, // keep a max of each type of minerals in store
+    ROOM_TRADING: false, // set this true to enable haulers within your colony to request resources from other rooms in your colony
     MIN_MINERAL_SELL_AMOUNT:20000,
     ENERGY_VALUE_CREDITS: 0.15, // assumed energy exchange rate (in credits) to determine best mineral sell offer
     //MAX_SELL_RANGE: 60,
