@@ -176,17 +176,19 @@ mod.analyze = function(){
             if( creep.spawning ) { // count spawning time
                 entry.spawningTime++;
             }
-            else if( creep.ticksToLive ==  ( creep.data.body.claim !== undefined ? 499 : 1499 ) ){ // spawning complete
+            else if( creep.ticksToLive > 0 && !creep.memory.spawned ){ // spawning complete
+                creep.memory.spawned = true;
                 this.spawned.push(entry.creepName);
                 if (Game.spawns[entry.motherSpawn]) this.spawnsToProbe.push(entry.motherSpawn); // only push living spawns
             }
-            else if(creep.ticksToLive == ( entry.predictedRenewal ? entry.predictedRenewal : entry.spawningTime)) { // will die in ticks equal to spawning time or custom
+            else if(creep.ticksToLive <= ( entry.predictedRenewal ? entry.predictedRenewal : entry.spawningTime) && !creep.memory.nearDeath) { // will die in ticks equal to spawning time or custom
+                creep.memory.nearDeath = true;
                 if(CENSUS_ANNOUNCEMENTS) console.log(dye(CRAYON.system, entry.creepName + ' &gt; ') + dye(CRAYON.death, 'Farewell!') );
                 this.predictedRenewal.push(creep.name);
                 if( !this.spawnsToProbe.includes(entry.motherSpawn) && entry.motherSpawn != 'unknown' && Game.spawns[entry.motherSpawn] ) {
                     this.spawnsToProbe.push(entry.motherSpawn);
                 }
-            } 
+            }
             entry.ttl = creep.ticksToLive;
 
             if( entry.creepType &&
