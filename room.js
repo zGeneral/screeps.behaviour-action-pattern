@@ -1199,6 +1199,8 @@ mod.extend = function(){
         for(var structureType in data) {
             for(var i=0;i<data[structureType].length;i++) {
                 let structure = data[structureType][i];
+                // don't reset busy labs
+                if (structureType == STRUCTURE_LAB && structure.reactionState != LAB_IDLE) continue;
                 for(var j=0;j<structure.orders.length;j++) {
                     let order = structure.orders[j];
                     if (order.orderRemaining <= 0) {
@@ -1349,7 +1351,7 @@ mod.extend = function(){
         let labs = this.find(FIND_MY_STRUCTURES, { filter: (s) => { return s.structureType == STRUCTURE_LAB; } } );
         let master_labs = labs.filter( (l) => {
             let data = this.memory.resources.lab.find( (s) => s.id == l.id );
-            return data ? data.reactionState == LAB_MASTER : false;
+            return data ? (data.slave_a && data.slave_b) : false;
         } );
         for (var i=0;i<master_labs.length;i++) {
             // see if the reaction is possible
@@ -1372,6 +1374,24 @@ mod.extend = function(){
             }
         }
     };
+    Room.prototype.findContainerWith = function(resourceType, amountMin) {
+        if (!amountMin) amountMin = 1;
+        if (!RESOURCES_ALL.find((r)=>{r==resourceType;})) return ERR_INVALID_ARGS;
+
+        let data = this.memory;
+        if (data && data.container && data.container.length > 0) {
+            for (var i=0;i<data.container.length;i++) {
+                let d = data.container[i];
+                let container = Game.getObjectById(d.id);
+                if (container && container.store[resourceType]) {
+                    let amount = container.store[resourceType];
+                    if (amount >= amountMin) return { structure: container, amount: amount };
+                }
+            }
+        }
+
+        return null;
+    }
     Room.prototype.prepareResourceOrder = function(containerId, resourceType, amount) {
         let container = Game.getObjectById(containerId);
         if (!this.my || !container || !container.room.name == this.name ||
@@ -1432,7 +1452,7 @@ mod.extend = function(){
                 containerData.orders.push({
                     type: resourceType,
                     orderAmount: amount,
-                    orderRemaining: amount,
+                    orderRemaining: amount - (container.store[resourceType]||0),
                     storeAmount: 0
                 });
             }
@@ -1559,8 +1579,11 @@ mod.extend = function(){
 
         // place reaction order with master lab
         let labData = this.memory.resources.lab.find( (l) => l.id == labId );
+        let state = LAB_MASTER;
         if ( labData ) {
-            labData.reactionState = LAB_MASTER;
+            if (labData.reactionState == LAB_SLAVE_1) state = LAB_SLAVE_1;
+            if (labData.reactionState == LAB_SLAVE_2) state = LAB_SLAVE_2;
+            labData.reactionState = state;
             labData.reactionType = resourceType;
             labData.reactionAmount = amount;
             labData.slave_a = lab_slave_a.id;
@@ -1569,16 +1592,57 @@ mod.extend = function(){
 
         // place orders with slave labs
         labData = this.memory.resources.lab.find( (l) => l.id == lab_slave_a.id );
+        let slaveState = LAB_SLAVE_1;
+        if (state == LAB_SLAVE_1) slaveState = LAB_SLAVE_2;
+        if (state == LAB_SLAVE_2) slaveState = LAB_SLAVE_3;
         if ( labData ) {
-            labData.reactionState = LAB_SLAVE_1;
+            labData.reactionState = slaveState;
             labData.master = lab_master.id;
             this.placeOrder(lab_slave_a.id, component_a, amount);
+
+            let available = 0;
+            if (this.memory.container) {
+                for (var i=0;i<this.memory.container.length;i++) {
+                    let d = this.memory.container[i];
+                    let container = Game.getObjectById(d.id);
+                    if (container && container.store[component_a]) {
+                        available += container.store[component_a];
+                    }
+                }
+            }
+            if (this.storage) available += this.storage.store[component_a]||0;
+            if (this.terminal) available += this.terminal.store[component_a]||0;
+            if (available < amount) {
+                if (this.placeReactionOrder(lab_slave_a.id,component_a,amount-available) == OK) {
+                    let order = labData.orders.find((o)=>o.type==component_a);
+                    if (order) order.orderRemaining = available;
+                }
+            }
         }
         labData = this.memory.resources.lab.find( (l) => l.id == lab_slave_b.id );
         if ( labData ) {
-            labData.reactionState = LAB_SLAVE_1;
+            labData.reactionState = slaveState;
             labData.master = lab_master.id;
             this.placeOrder(lab_slave_b.id, component_b, amount);
+
+            let available = 0;
+            if (this.memory.container) {
+                for (var i=0;i<this.memory.container.length;i++) {
+                    let d = this.memory.container[i];
+                    let container = Game.getObjectById(d.id);
+                    if (container) {
+                        available += container.store[component_b]||0;
+                    }
+                }
+            }
+            if (this.storage) available += this.storage.store[component_b]||0;
+            if (this.terminal) available += this.terminal.store[component_b]||0;
+            if (available < amount) {
+                if (this.placeReactionOrder(lab_slave_a.id,component_a,amount-available) == OK) {
+                    let order = labData.orders.find((o)=>o.type==component_b);
+                    if (order) order.orderRemaining = available;
+                }
+            }
         }
 
         //console.log(lab_master,"found slave labs",lab_slave_a,"for",component_a,"and",lab_slave_b,"for",component_b);

@@ -145,25 +145,6 @@ action.findNeeding = function(room, resourceType, amountMin, structureId){
     // no destination found
     return null;
 };
-action.findContainerWith = function(room, resourceType, amountMin) {
-    if (!amountMin) amountMin = 1;
-//    if (!RESOURCES_ALL.find((r)=>{r==resourceType;})) return ERR_INVALID_ARGS;
-
-    let data = room.memory;
-    if (data.container.length > 0) {
-        for (var i=0;i<data.container.length;i++) {
-            let d = data.container[i];
-            let container = Game.getObjectById(d.id);
-            if (container.store[resourceType]) {
-                let amount = container.store[resourceType];
-                if (amount >= amountMin) return { structure: container, amount: amount };
-            }
-        }
-    }
-
-    // no container with enough resource found
-    return null;
-}
 action.isValidAction = function(creep){
     return true;
 };
@@ -202,7 +183,7 @@ action.newTarget = function(creep){
                             if (DEBUG_LOGISTICS) console.log(creep,lab,"needs",amount,lab.mineralType);
                             if (room.storage.store[lab.mineralType]) return room.storage;
                             if (room.terminal.store[lab.mineralType]) return room.terminal;
-                            let ret = this.findContainerWith(room, lab.mineralType);
+                            let ret = room.findContainerWith(lab.mineralType);
                             if (DEBUG_LOGISTICS) console.log(creep,lab,"found some in",ret.structure)
                             if (ret) return ret.structure;
                         }
@@ -216,7 +197,7 @@ action.newTarget = function(creep){
                             if (DEBUG_LOGISTICS) console.log(creep,lab,"needs",order.orderRemaining+order.storeAmount,resourceType);
                             if (room.storage.store[resourceType]) return room.storage;
                             if (room.terminal.store[resourceType]) return room.terminal;
-                            let ret = this.findContainerWith(room, resourceType);
+                            let ret = room.findContainerWith(resourceType);
                             if (ret) return ret.structure;
                         }
                     }
@@ -231,7 +212,7 @@ action.newTarget = function(creep){
                         if (DEBUG_LOGISTICS) console.log(creep,lab,"needs",amount,RESOURCE_ENERGY);
                         if (room.storage.store[RESOURCE_ENERGY]) return room.storage;
                         if (room.terminal.store[RESOURCE_ENERGY]) return room.terminal;
-                        let ret = this.findContainerWith(room, RESOURCE_ENERGY);
+                        let ret = room.findContainerWith(RESOURCE_ENERGY);
                         if (ret) return ret.structure;
                     }
                 }
