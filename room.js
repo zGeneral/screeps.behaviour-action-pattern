@@ -1230,23 +1230,34 @@ mod.extend = function(){
     };
     Room.prototype.updateRoomOrders = function () {
         if (!this.memory.resources || !this.memory.resources.orders) return;
+        let rooms = _.filter(Game.rooms, (room) => { return room.my && room.storage && room.terminal; });
         let orders = this.memory.resources.orders;
         for (var i=0;i<orders.length;i++) {
             let order = orders[i];
             let amountRemaining = order.amount;
             for (var j=0;j<order.offers.length;j++) {
                 let offer = order.offers[j];
-                amountRemaining -= offer.amount;
-                if (amountRemaining <= 0 && i < order.offers.length-1) order.offers = order.offers.slice(0,i);
+                if (amountRemaining > 0) {
+                    amountRemaining -= offer.amount;
+                } else {
+                    if (Memory.rooms[offer.room] && Memory.rooms[offer.room].resources && Memory.rooms[offer.room].resources.offers) {
+                        let remoteOffers = Memory.rooms[offer.room].resources.offers;
+                        let idx = remoteOffers.indexOf((o)=>{ return o.room==this.name && o.id==order.id && o.type==order.type; });
+                        remoteOffers = remoteOffers.splice(idx,1);
+                    }
+                    orders = orders.splice[i--,1];
+                }
             }
             if (amountRemaining > 0) {
-                let rooms = _.filter(Game.rooms, (room) => { return room.my && room.storage && room.terminal; });
                 rooms.sort((a,b)=>{ return Game.map.getRoomLinearDistance(this.name,a.name,true) - Game.map.getRoomLinearDistance(this.name,b.name,true); });
                 for (var j=0;j<rooms.length;j++) {
                     let room = rooms[j];
                     let available = (room.storage[order.type]||0) + (room.terminal[order.type]||0);
-                    if (available < 100) continue;
+                    if (available < 100 || !room.memory.resources) continue;
+                    if (!room.memory.resources.offers) room.memory.resources.offers = [];
                     let existingOffer = order.offers.find((o)=>o.room==this.name);
+                    let remoteOffers = room.memory.resources.offers;
+                    let existingRemoteOffer = remoteOffers.find((o)=>{ return o.room==this.name && o.id==order.id && o.type==order.type; });
                     if (existingOffer) {
                         amountRemaining -= (available - existingOffer.amount);
                         existingOffer.amount = available;
@@ -1254,6 +1265,16 @@ mod.extend = function(){
                         amountRemaining -= available;
                         order.offers.push({
                             room: this.name,
+                            amount: available
+                        });
+                    }
+                    if (existingRemoteOffer) {
+                        existingRemoteOffer.amount = available;
+                    } else {
+                        remoteOffers.push({
+                            room: room.name,
+                            id: order.id,
+                            type: order.type,
                             amount: available
                         });
                     }
@@ -1327,7 +1348,11 @@ mod.extend = function(){
                 targetRoom._isReceivingEnergy = true;
                 let response = this.terminal.send('energy', 50000, targetRoom.name, 'have fun');
                 if( DEBUG ) logSystem(that.name, `Transferring 50k energy to ${targetRoom.name}: ${translateErrorCode(response)}`);
+                transacting = response == OK;
             }
+        }
+        if ( !transacting ) {
+            // TODO: implement transaction logic to fill offers
         }
     };
     Room.prototype.processInvaders = function(){

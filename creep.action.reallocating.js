@@ -185,7 +185,7 @@ action.newTarget = function(creep){
                             if (room.terminal.store[lab.mineralType]) return room.terminal;
                             let ret = room.findContainerWith(lab.mineralType);
                             if (ret) return ret.structure;
-                            if (ROOM_TRADING) room.placeRoomOrder(lab.id,lab.mineralType,amount);
+                            if (ROOM_TRADING && !(room.mineralType == RESOURCE_ENERGY || room.mineralType == lab.mineralType)) room.placeRoomOrder(lab.id,lab.mineralType,amount);
                         }
                     } else {
                         // lab is empty so check and fill order
@@ -199,7 +199,7 @@ action.newTarget = function(creep){
                             if (room.terminal.store[resourceType]) return room.terminal;
                             let ret = room.findContainerWith(resourceType);
                             if (ret) return ret.structure;
-                            if (ROOM_TRADING) room.placeRoomOrder(lab.id,resourceType,order.orderRemaining);
+                            if (ROOM_TRADING && !(room.mineralType == RESOURCE_ENERGY || room.mineralType == lab.mineralType)) room.placeRoomOrder(lab.id,resourceType,order.orderRemaining);
                         }
                     }
                     amount = this.labNeeds(lab,RESOURCE_ENERGY);
