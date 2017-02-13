@@ -199,7 +199,7 @@ action.newTarget = function(creep){
                             if (room.terminal.store[resourceType]) return room.terminal;
                             let ret = room.findContainerWith(resourceType);
                             if (ret) return ret.structure;
-                            if (ROOM_TRADING && !(room.mineralType == RESOURCE_ENERGY || room.mineralType == lab.mineralType)) room.placeRoomOrder(lab.id,resourceType,order.orderRemaining);
+                            if (ROOM_TRADING && !(room.mineralType == RESOURCE_ENERGY || room.mineralType == resourceType)) room.placeRoomOrder(lab.id,resourceType,order.orderRemaining);
                         }
                     }
                     amount = this.labNeeds(lab,RESOURCE_ENERGY);
@@ -425,19 +425,20 @@ action.work = function(creep) {
     } else if (type == STRUCTURE_LAB) {
         // drop off at lab
         amount = this.labNeeds(target, RESOURCE_ENERGY);
-        if (amount > 0 && creep.carry.energy > 0) {
+        if (amount > 0 && (creep.carry.energy||0) > 0) {
             resource = RESOURCE_ENERGY;
         } else {
             let order = this.getLabOrder(target);
             if (order) resource = order.type;
             amount = this.labNeeds(target, resource);
-            if (!(amount > 0 && creep.carry[resource] > 0)) {
+            if (!(amount > 0 && (creep.carry[resource]||0) > 0)) {
                 resource = null;
             }
         }
-        if (resource) workResult = creep.transfer(target, resource, Math.min(amount,creep.carry[resource]));
+        amount = Math.min(amount,creep.carry[resource]||0);
+        if (resource) workResult = creep.transfer(target, resource, amount);
 
-        if (creep.carry[resource] > amount) {
+        if ((creep.carry[resource]||0) > amount) {
             this.assignDropOff(creep, resource);
         } else {
             this.cancelAction(creep);
@@ -451,9 +452,10 @@ action.work = function(creep) {
                 break;
             }
         }
-        if (resource) workResult = creep.transfer(target, resource, Math.min(amount,creep.carry[resource]));
+        amount = Math.min(amount,creep.carry[resource]||0);
+        if (resource) workResult = creep.transfer(target, resource, amount);
 
-        if (creep.carry[resource] > amount) {
+        if ((creep.carry[resource]||0) > amount) {
             this.assignDropOff(creep, resource);
         } else {
             this.cancelAction(creep);
@@ -471,9 +473,10 @@ action.work = function(creep) {
                 break;
             }
         }
-        if (resource) workResult = creep.transfer(target, resource, Math.min(amount,creep.carry[resource]));
+        amount = Math.min(amount,creep.carry[resource]||0);
+        if (resource) workResult = creep.transfer(target, resource, amount);
 
-        if (creep.carry[resource] > amount) {
+        if ((creep.carry[resource]||0) > amount) {
             this.assignDropOff(creep, resource);
         } else {
             this.cancelAction(creep);
@@ -487,9 +490,10 @@ action.work = function(creep) {
                 break;
             }
         }
-        if (resource) workResult = creep.transfer(target, resource, Math.min(amount,creep.carry[resource]));
+        amount = Math.min(amount,creep.carry[resource]||0);
+        if (resource) workResult = creep.transfer(target, resource, amount);
 
-        if (creep.carry[resource] > amount) {
+        if ((creep.carry[resource]||0) > amount) {
             this.assignDropOff(creep, resource);
         } else {
             this.cancelAction(creep);
@@ -503,7 +507,7 @@ action.work = function(creep) {
         if (data) {
             let order = data.orders.find(o=>o.type==resource);
             if (order && order.orderRemaining > 0) {
-                order.orderRemaining -= Math.min(amount,order.orderRemaining);
+                order.orderRemaining -= amount;
             }
         }
     }
