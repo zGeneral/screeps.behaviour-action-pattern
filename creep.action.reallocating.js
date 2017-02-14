@@ -86,7 +86,7 @@ action.getLabOrder = function(lab) {
     var order = null;
     let room = lab.room;
     if (!room.memory || !room.memory.resources) return null;
-    
+
     let data = room.memory.resources.lab.find( (s) => s.id == lab.id );
     if (data) {
         let orders = data.orders;
@@ -275,7 +275,7 @@ action.newTarget = function(creep){
 //                    }
                 };
                 // check orders
-                if (room.memory.resources) {
+                if (room.memory.resources && room.memory.resources.terminal[0]) {
                     let orders = room.memory.resources.terminal[0].orders;
                     let type = null;
                     let amount = 0;
