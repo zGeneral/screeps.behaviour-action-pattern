@@ -1414,6 +1414,9 @@ mod.getCostMatrix = function(roomName) {
     }
     // unset values / undefined reads from map
 };
+mod.validField = function(roomPos, checkWalkable = false, where = null) {
+    return mod.validFields(roomPos.roomName, roomPos.x, roomPos.x, roomPos.y, roomPos.y, checkWalkable, where);
+};
 mod.validFields = function(roomName, minX, maxX, minY, maxY, checkWalkable = false, where = null) {
     let look;
     if( checkWalkable ) {

@@ -215,7 +215,7 @@ mod.extend = function(){
         }
     };
     Creep.prototype.getPath = function( targetPos, ignoreCreeps ) {
-        let range = undefined;
+        let range = Room.validField(targetPos, true) ? 1 : 0; // check walkable
         let finalPos = targetPos;
         let maxRooms = 16; // screeps default
         let path;
