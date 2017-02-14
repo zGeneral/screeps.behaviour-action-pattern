@@ -85,7 +85,8 @@ action.getLabOrder = function(lab) {
     if (!lab) return null;
     var order = null;
     let room = lab.room;
-
+    if (!room.memory || !room.memory.resources) return null;
+    
     let data = room.memory.resources.lab.find( (s) => s.id == lab.id );
     if (data) {
         let orders = data.orders;
@@ -164,12 +165,13 @@ action.newTarget = function(creep){
     var target = null;
     if( creep.sum == 0) {
         let data = room.memory;
-        if (data) {
+        if (data && data.labs) {
             // check labs for needs and make sure to empty the lab before filling
             if (data.labs.length > 0) {
                 for (var i=0;i<data.labs.length;i++) {
                     let d = data.labs[i];
                     let lab = Game.getObjectById(d.id);
+                    if (!lab) continue;
                     var amount = 0;
                     if (lab.mineralAmount > 0) {
                         amount = this.labNeeds(lab,lab.mineralType);
