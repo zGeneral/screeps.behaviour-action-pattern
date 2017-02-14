@@ -1312,7 +1312,8 @@ mod.extend = function(){
             if (!targetRoom.terminal) continue;
             let store = this.terminal.store[offer.type]||0;
             let onOrder = 0;
-            let terminalOrder = this.memory.resources.terminal[0].orders.find((o)=>{ return o.type==offer.type; });
+            let terminalOrder = null;
+            if (this.memory.resources.terminal[0]) terminalOrder = this.memory.resources.terminal[0].orders.find((o)=>{ return o.type==offer.type; });
             if (terminalOrder) onOrder = terminalOrder.orderRemaining;
             let amount = Math.max(offer.amount,100);
             if (amount > store + onOrder) {
