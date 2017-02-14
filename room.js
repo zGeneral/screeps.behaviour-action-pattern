@@ -1463,6 +1463,7 @@ mod.extend = function(){
     Room.prototype.processLabs = function() {
         // run lab reactions WOO!
         let labs = this.find(FIND_MY_STRUCTURES, { filter: (s) => { return s.structureType == STRUCTURE_LAB; } } );
+        if (!this.memory.resources) return;
         let master_labs = labs.filter( (l) => {
             let data = this.memory.resources.lab.find( (s) => s.id == l.id );
             return data ? (data.slave_a && data.slave_b) : false;
@@ -1707,6 +1708,14 @@ mod.extend = function(){
         let lab_master = Game.getObjectById(labId);
         if (!LAB_REACTIONS.hasOwnProperty(resourceType)) {
             return ERR_INVALID_ARGS;
+        }
+        if (this.memory.resources === undefined) {
+            this.memory.resources = {
+                lab: [],
+                container: [],
+                terminal: [],
+                storage: []
+            };
         }
         let component_a = LAB_REACTIONS[resourceType][0];
         let component_b = LAB_REACTIONS[resourceType][1];
