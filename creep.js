@@ -215,7 +215,11 @@ mod.extend = function(){
         }
     };
     Creep.prototype.getPath = function( targetPos, ignoreCreeps ) {
-        let range = Room.validField(targetPos, true) ? 1 : 0; // check walkable
+        let invalidObject = o => {
+            return ((o.type === LOOK_TERRAIN && o.terrain === 'wall') ||
+                (o.type == LOOK_STRUCTURES && OBSTACLE_OBJECT_TYPES.includes(o.structure.structureType) ));
+        };
+        let range = !_.some(targetPos.look(), invalidObject) ? 0 : 1;
         let finalPos = targetPos;
         let maxRooms = 16; // screeps default
         let path;
@@ -570,7 +574,7 @@ mod.search = function(pos, targetPos, range, ignoreCreeps, maxRooms, roomsOnPath
         }
     });
     // TODO check incomplete / ops / etc
-    if (range === undefined) {
+    if (!range) {
         if (rawPath && _.isArray(rawPath.path)) {
             rawPath.path.push(targetPos);
         } else {
