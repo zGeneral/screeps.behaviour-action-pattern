@@ -1258,8 +1258,16 @@ mod.extend = function(){
                 rooms.sort((a,b)=>{ return Game.map.getRoomLinearDistance(this.name,a.name,true) - Game.map.getRoomLinearDistance(this.name,b.name,true); });
                 for (var j=0;j<rooms.length;j++) {
                     let room = rooms[j];
+                    if (room.memory.resources === undefined) {
+                        room.memory.resources = {
+                            lab: [],
+                            container: [],
+                            terminal: [],
+                            storage: []
+                        };
+                    }
                     let available = (room.storage.store[order.type]||0) + (room.terminal.store[order.type]||0);
-                    if (available < 100 || !room.memory.resources) continue;
+                    if (available < 100) continue;
                     available = Math.min(available,amountRemaining);
                     if (!room.memory.resources.offers) room.memory.resources.offers = [];
                     let existingOffer = order.offers.find((o)=>o.room==this.name);
