@@ -113,7 +113,7 @@ action.findNeeding = function(room, resourceType, amountMin, structureId){
                 let d = data.labs[i];
                 let lab = Game.getObjectById(d.id);
                 let amount = this.labNeeds(lab,resourceType);
-                if (amount >= amountMin && (lab.mineralAmount == 0 || lab.mineralType == resourceType) && d.id != structureId)
+                if (amount >= amountMin && (lab.mineralAmount == 0 || lab.mineralType == resourceType || resourceType == RESOURCE_ENERGY) && d.id != structureId)
                     return { structure: lab, amount: amount};
             }
         }
@@ -505,7 +505,8 @@ action.work = function(creep) {
     }
     if (workResult == OK && creep.sum > 0) {
         // update order
-        let data = room.memory.resources[target.structureType].find((s)=>s.id==target.id);
+        let data = null;
+        if (room.memory.resources) data = room.memory.resources[target.structureType].find((s)=>s.id==target.id);
         if (data) {
             let order = data.orders.find(o=>o.type==resource);
             if (order && order.orderRemaining > 0) {
