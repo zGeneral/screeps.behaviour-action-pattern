@@ -138,6 +138,10 @@ mod.extend = function(){
             if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, pos:this.pos, range, intentionRange, drive: 'arrived', Creep:'drive'}, 'arrived');
             return;
         }
+        if (this.getActiveBodyparts(MOVE) === 0) {
+            if ( DEBUG && TRACE ) trace('Creep', {creepName:this.name, moveParts: this.getActiveBodyparts(MOVE), drive: 'no move parts'}, 'no move parts');
+            return;
+        }
         if( this.fatigue > 0 ) {
             if( DEBUG && TRACE ) trace('Creep', {creepName:this.name, pos:this.pos, fatigue: this.fatigue, drive: 'fatigued', Creep:'drive'}, 'fatigued');
             return;
@@ -343,7 +347,7 @@ mod.extend = function(){
     };
     
     Creep.prototype.controllerSign = function() {
-        if(CONTROLLER_SIGN && (!this.room.controller.sign || this.room.controller.sign.username != this.owner.username)) {
+        if(CONTROLLER_SIGN && (!this.room.controller.sign || this.room.controller.sign.username != this.owner.username || (CONTROLLER_SIGN_UPDATE && this.room.controller.sign.text != CONTROLLER_SIGN_MESSAGE))) {
             this.signController(this.room.controller, CONTROLLER_SIGN_MESSAGE);
         }
     };
