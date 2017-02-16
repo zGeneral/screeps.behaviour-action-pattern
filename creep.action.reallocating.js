@@ -315,7 +315,7 @@ action.newTarget = function(creep){
     }
     else {
         // find destination for carried resource
-        let resourceType = creep.carry[0].resourceType;
+        let resourceType = Object.keys(creep.carry)[0];
         return Game.getObjectById(this.findNeeding(room, resourceType).structureId);
     }
 };
