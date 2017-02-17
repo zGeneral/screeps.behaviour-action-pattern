@@ -125,6 +125,14 @@ module.exports = function(globalOpts = {}){
                 else {
                     matrix = this.getCreepMatrix(room);
                 }
+                if (TRAVELER_AVOID_SK) {
+                    let parsed = /^[WE]([0-9]+)[NS]([0-9]+)$/.exec(roomName);
+                    let isSK = ((parsed[1] % 10 === 4) || (parsed[1] % 10 === 6)) &&
+                        ((parsed[2] % 10 === 4) || (parsed[2] % 10 === 6));
+                    if (isSK) {
+                        Traveler.addSKsToMatrix(room, matrix);
+                    }
+                }
                 for (let obstacle of options.obstacles) {
                     matrix.set(obstacle.pos.x, obstacle.pos.y, 0xff);
                 }
@@ -301,6 +309,17 @@ module.exports = function(globalOpts = {}){
         }
         static addCreepsToMatrix(room, matrix) {
             room.find(FIND_CREEPS).forEach((creep) => matrix.set(creep.pos.x, creep.pos.y, 0xff));
+            return matrix;
+        }
+        static addSKsToMatrix(room, matrix) {
+            room.find(FIND_CREEPS,{filter:(c)=>{return c.owner.username=='Source Keeper';}}).forEach((creep) => {
+                var distance = TRAVELER_AVOID_SK_DISTANCE;
+                for(var x=-distance;x<=distance;x++) {
+                    for(var y=-distance;y<=distance;y++) {
+                        costs.set(creep.pos.x+x, creep.pos.y+y, TRAVELER_AVOID_SK_COST);
+                    }
+                }
+            });
             return matrix;
         }
         static serializePath(startPos, path) {
