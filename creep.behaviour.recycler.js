@@ -3,7 +3,7 @@ module.exports = mod;
 mod.name = 'recycler';
 mod.run = function(creep) {
     // Assign next Action
-    if( !creep.action || creep.action.name === 'idle' ) {
+    if( !creep.action || creep.action.name === 'idle' || !creep.action.isMember(mod.actionPriority()) ) {
         delete creep.data.targetId;
         delete creep.data.path;
         this.nextAction(creep);
@@ -19,8 +19,8 @@ mod.run = function(creep) {
 mod.nextAction = function(creep) {
     Creep.action.recycling.assign(creep);
 };
-mod.nextAction = function(creep){
-    const priority = [
+mod.actionPriority = function() {
+    return [
         // Creep.action.picking, // TODO only energy
         Creep.action.withdrawing,
         Creep.action.uncharging,
@@ -28,12 +28,12 @@ mod.nextAction = function(creep){
         Creep.action.storing,
         Creep.action.feeding,
         Creep.action.dropping,
-        ];
-
-    if( !creep.data.travelRoom ) {
-        priority.shift();
-        priority.shift();
-    }
+        Creep.action.recycling,
+        Creep.action.idle,
+    ];
+};
+mod.nextAction = function(creep){
+    const priority = mod.actionPriority();
 
     for(var iAction = 0; iAction < priority.length; iAction++) {
         var action = priority[iAction];
@@ -43,16 +43,36 @@ mod.nextAction = function(creep){
             return;
         }
     }
-
-    if (creep.sum) { // TODO if touching another recycler, just die
-        Creep.action.idle.assign(creep); // TODO picking?
-    } else {
-        Creep.action.recycling.assign(creep);
-    }
 };
 mod.strategies = {
     defaultStrategy: {
         name: `default-${mod.name}`,
+    },
+    recycling: {
+        name: `recycling-${mod.name}`,
+        isValidAction: function(creep){
+            return !creep.sum; // only recycle when empty
+        },
+    },
+    uncharging: {
+        name: `uncharging-${mod.name}`,
+        isValidAction: function(creep){
+            return (
+                creep.data.travelRoom && // only gather when on mission
+                creep.sum < creep.carryCapacity
+            ) || false;
+        },
+    },
+    withdrawing: {
+        name: `withdrawing-${mod.name}`,
+        isValidAction: function(creep) {
+            return (
+                creep.data.travelRoom && // only gather when on mission
+                creep.room.storage &&
+                creep.room.storage.store.energy > 0 &&
+                creep.sum < creep.carryCapacity
+            ) || false;
+        }
     },
     travelling: {
         name: `travelling-${mod.name}`,
