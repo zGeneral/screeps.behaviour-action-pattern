@@ -7,9 +7,9 @@ let mod = {
     DEBUG: true, // gimme some more details, use false not undefined to unset
     TRACE: false, // use Memory.debugTrace for low-level information
     TRAVELER_THRESHOLD: 50, // CPU Usage before warning about pathing cost
-    TRAVELER_AVOID_SK: true,
-    TRAVELER_AVOID_SK_DISTANCE: 3,
-    TRAVELER_AVOID_SK_COST: 20,
+    TRAVELER_AVOID_SK: true, // This option raises the cost of walking near SKs allowing civilians to move safely through SK rooms
+    TRAVELER_AVOID_SK_DISTANCE: 3, // This is the distance that creeps will attempt to avoid SKs by
+    TRAVELER_AVOID_SK_COST: 20, // This is the cost that all tiles in range of an SK will be set to for pathing
     GRAFANA: false, // track for Grafana data
     GRAFANA_INTERVAL: 3, // loops between Grafana tracking - No lower than 3.
     CENSUS_ANNOUNCEMENTS: true, // log birth and death
