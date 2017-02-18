@@ -120,9 +120,11 @@ mod.handleCreepDied = function(creepName) {
         return;
     }
     const flag = Game.flags[entry.destiny.targetName];
-    const running = mod.memory(flag).running;
-    const index = _.indexOf(running, creepName);
-    running.splice(index,1);
+    if (flag) {
+        const running = mod.memory(flag).running;
+        const index = _.indexOf(running, creepName);
+        running.splice(index, 1);
+    }
 };
 mod.creep = {
     recycler: {
