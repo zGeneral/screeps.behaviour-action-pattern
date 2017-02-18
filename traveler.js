@@ -316,7 +316,7 @@ module.exports = function(globalOpts = {}){
                 var distance = TRAVELER_AVOID_SK_DISTANCE;
                 for(var x=-distance;x<=distance;x++) {
                     for(var y=-distance;y<=distance;y++) {
-                        costs.set(creep.pos.x+x, creep.pos.y+y, TRAVELER_AVOID_SK_COST);
+                        matrix.set(creep.pos.x+x, creep.pos.y+y, TRAVELER_AVOID_SK_COST);
                     }
                 }
             });
