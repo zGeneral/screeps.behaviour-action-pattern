@@ -24,6 +24,11 @@ mod.handleFlagFound = flag => {
 };
 // check if a new creep has to be spawned
 mod.checkForRequiredCreeps = (flag) => {
+    if( flag.room && flag.room.my ) {
+        // robbing own rooms is handled by Task.delivery
+        return;
+    }
+
     // get task memory
     let memory = Task.robbing.memory(flag);
     // count creeps assigned to task
