@@ -1,4 +1,4 @@
-# Open Collaboration Society
+# Open Collaboration Society 
 
 VERSION 0.6.2 - February 2017
 
